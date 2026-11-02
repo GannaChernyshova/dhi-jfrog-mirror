@@ -1,0 +1,4 @@
+.env
+out/
+keys/*.live
+.copy.err

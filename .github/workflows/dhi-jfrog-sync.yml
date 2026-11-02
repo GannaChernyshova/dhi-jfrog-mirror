@@ -1,0 +1,61 @@
+name: DHI → Artifactory sync
+
+# Keeps Artifactory in step with the DHI repo mirrored in your Docker Hub org.
+# DHI re-points tags at new digests on every CVE rebuild, so this runs hourly
+# and can also be triggered right away from a Docker Hub webhook (through a
+# small relay that calls the GitHub repository_dispatch API with type
+# "dhi-updated" - Hub webhooks cannot send the auth header GitHub needs).
+on:
+  schedule:
+    - cron: "17 * * * *"
+  repository_dispatch:
+    types: [dhi-updated]
+  workflow_dispatch:
+
+concurrency:
+  group: dhi-jfrog-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      # Repository variables (Settings → Secrets and variables → Actions → Variables)
+      DOCKER_ORG: ${{ vars.DOCKER_ORG }}
+      SRC_IMAGE: ${{ vars.SRC_IMAGE }}
+      DEST_IMAGE: ${{ vars.DEST_IMAGE }}
+      TAGS: ${{ vars.TAGS }}
+      DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+      JFROG_HOST: ${{ vars.JFROG_HOST }}
+      JFROG_REPO: ${{ vars.JFROG_REPO }}
+      JFROG_USER: ${{ vars.JFROG_USER }}
+      # Repository secrets
+      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+      JFROG_TOKEN: ${{ secrets.JFROG_TOKEN }}
+      REGCLIENT_VERSION: v0.11.7
+      COSIGN_VERSION: v3.1.4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install regctl, regsync, cosign
+        run: |
+          base=https://github.com/regclient/regclient/releases/download/${REGCLIENT_VERSION}
+          for b in regctl regsync; do
+            curl -sSfL "$base/$b-linux-amd64" -o "/usr/local/bin/$b" && chmod +x "/usr/local/bin/$b"
+          done
+          curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
+            -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
+
+      - name: Log in
+        run: bash scripts/01-login.sh
+
+      - name: Sync image and attestations (regsync)
+        run: regsync once -c regsync.yaml
+
+      - name: Verify from Artifactory (digests, attestations, signatures)
+        run: |
+          bash scripts/02-inspect.sh >/dev/null   # refreshes and checks the DHI key
+          bash scripts/04-verify.sh

@@ -1,0 +1,40 @@
+version: 1
+# Continuous Docker Hub → Artifactory mirror of a DHI repository, with its
+# signed attestations. Values come from .env (the Makefile exports it):
+#   make sync-once   one pass (what CI runs)
+#   make sync        long-running, re-checks every `interval`
+#
+# DHI re-points existing tags at new digests on every CVE rebuild; regsync
+# detects the new digest and copies it plus its attestations.
+
+creds:
+  - registry: docker.io
+    user: '{{env "DOCKER_USERNAME"}}'
+    pass: '{{env "DOCKER_TOKEN"}}'
+  - registry: registry.scout.docker.com
+    user: '{{env "DOCKER_USERNAME"}}'
+    pass: '{{env "DOCKER_TOKEN"}}'
+  - registry: '{{env "JFROG_HOST"}}'
+    user: '{{env "JFROG_USER"}}'
+    pass: '{{env "JFROG_TOKEN"}}'
+
+defaults:
+  parallel: 2
+  interval: 60m
+
+sync:
+  - source: 'docker.io/{{env "DOCKER_ORG"}}/{{env "SRC_IMAGE"}}'
+    target: '{{env "JFROG_HOST"}}/{{env "JFROG_REPO"}}/{{env "DEST_IMAGE"}}'
+    type: repository
+    # Attestations live in the Scout registry, not next to the image on Hub.
+    referrers: true
+    referrerSource: 'registry.scout.docker.com/{{env "DOCKER_ORG"}}/{{env "SRC_IMAGE"}}'
+    referrerTarget: '{{env "JFROG_HOST"}}/{{env "JFROG_REPO"}}/{{env "DEST_IMAGE"}}'
+    # Tag filters are regular expressions (not templated). A DHI repo has
+    # thousands of tags, so always allow-list what you actually use.
+    tags:
+      allow:
+        - '^22-alpine$'
+        - '^22-alpine-dev$'
+        - '^24$'
+        - '^24-dev$'

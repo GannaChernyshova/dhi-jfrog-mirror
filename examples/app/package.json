@@ -1,0 +1,10 @@
+{
+  "name": "hello-dhi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Example app built on the Docker Hardened Node image mirrored in Artifactory",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
