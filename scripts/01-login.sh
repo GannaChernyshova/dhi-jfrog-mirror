@@ -21,7 +21,7 @@ if command -v docker >/dev/null; then
       docker login -u "${SCOUT_USERNAME:-$DOCKER_ORG}" --password-stdin >/dev/null 2>&1; then
     ok "docker → docker.io as ${SCOUT_USERNAME:-$DOCKER_ORG}"
   else
-    warn "docker login docker.io failed - set SCOUT_USERNAME/SCOUT_TOKEN (Docker ID + PAT) for make use"
+    warn "docker login docker.io failed - set SCOUT_USERNAME/SCOUT_TOKEN (Docker ID + PAT) for docker scout"
   fi
 fi
 

@@ -14,8 +14,6 @@ DOCKER_ORG="${DOCKER_ORG:-}"
 SRC_IMAGE="${SRC_IMAGE:-dhi-node}"
 DEST_IMAGE="${DEST_IMAGE:-$SRC_IMAGE}"
 TAGS="${TAGS:-24}"
-case "$(uname -m)" in arm64|aarch64) host_arch=arm64 ;; *) host_arch=amd64 ;; esac
-PLATFORM="${PLATFORM:-linux/$host_arch}"
 
 # Source: the DHI repo mirrored into your Hub org. The image is on docker.io;
 # its signed attestations (SBOM, provenance, VEX, ...) are in the Scout
@@ -24,15 +22,13 @@ SRC="docker.io/${DOCKER_ORG}/${SRC_IMAGE}"
 ATT_SRC="registry.scout.docker.com/${DOCKER_ORG}/${SRC_IMAGE}"
 
 # Destination in Artifactory (repository-path method: <host>/<repo-key>/<image>).
-#   DEST  the repo the sync writes to; PULL is the same, used by developers and CI
+#   DEST  the repo the sync writes to (developers and CI pull from it too)
 : "${JFROG_HOST:?set JFROG_HOST in .env (e.g. acme.jfrog.io)}"
 JFROG_REPO="${JFROG_REPO:?set JFROG_REPO in .env (the Artifactory Docker repository)}"
 DEST="${JFROG_HOST}/${JFROG_REPO}/${DEST_IMAGE}"
-PULL="$DEST"
 
 DHI_KEY="$ROOT/keys/dhi-latest.pub"
 DHI_KEY_URL="https://registry.scout.docker.com/keyring/dhi/latest.pub"
-OUT="$ROOT/out"
 
 # DHI signatures are OCI referrers (--experimental-oci11) and are not in the
 # public Rekor log (--insecure-ignore-tlog), as documented by Docker.

@@ -52,7 +52,7 @@ jobs:
         run: bash scripts/01-login.sh
 
       - name: Sync image and attestations (regsync)
-        run: regsync once -c regsync.yaml
+        run: bash scripts/05-sync.sh
 
       - name: Verify from Artifactory (digests, attestations, signatures)
         run: |

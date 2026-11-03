@@ -1,8 +1,8 @@
 version: 1
 # Continuous Docker Hub → Artifactory mirror of a DHI repository, with its
-# signed attestations. Values come from .env (the Makefile exports it):
-#   make sync-once   one pass (what CI runs)
-#   make sync        long-running, re-checks every `interval`
+# signed attestations. Run it through scripts/05-sync.sh (make sync-once / make
+# sync, and the CI jobs do): it reads the settings from the environment and
+# writes the tag allow-list from TAGS at the @TAGS@ marker below.
 #
 # DHI re-points existing tags at new digests on every CVE rebuild; regsync
 # detects the new digest and copies it plus its attestations.
@@ -30,11 +30,9 @@ sync:
     referrers: true
     referrerSource: 'registry.scout.docker.com/{{env "DOCKER_ORG"}}/{{env "SRC_IMAGE"}}'
     referrerTarget: '{{env "JFROG_HOST"}}/{{env "JFROG_REPO"}}/{{env "DEST_IMAGE"}}'
-    # Tag filters are regular expressions (not templated). A DHI repo has
-    # thousands of tags, so always allow-list what you actually use.
+    # Tag filters are regular expressions and are not templated, so
+    # scripts/05-sync.sh fills in one '^tag$' line per tag in TAGS. A DHI repo
+    # has thousands of tags: only the ones you list are synced.
     tags:
       allow:
-        - '^22-alpine$'
-        - '^22-alpine-dev$'
-        - '^24$'
-        - '^24-dev$'
+        # @TAGS@

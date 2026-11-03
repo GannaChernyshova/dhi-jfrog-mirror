@@ -1,153 +1,76 @@
 # Docker Hardened Images in JFrog Artifactory
 
-Mirror Docker Hardened Images (DHI) from your Docker Hub organization into
-Artifactory **with their signed attestations** (SBOM, SLSA provenance, VEX,
-scan results), keep them in sync, and use them from laptops and CI.
-
-Based on [Mirror a DHI repository](https://docs.docker.com/dhi/how-to/mirror/),
-[Verify a DHI](https://docs.docker.com/dhi/how-to/verify/) and
-[Scan a DHI](https://docs.docker.com/dhi/how-to/scan/).
+Copy Docker Hardened Images (DHI) from your Docker Hub organization into JFrog
+Artifactory **together with their signed attestations** (SBOM, provenance, VEX,
+scan results), and keep them up to date. Developers and CI then pull DHI from
+Artifactory only.
 
 ## How it works
 
 ```
- Docker Hub (your org)                    Artifactory
- docker.io/<org>/dhi-node         image  ┐
- registry.scout.docker.com/...    attest.┘─ sync, by digest ─▶  <jfrog-repo>   DHI images + attestations
-                                                                   ▲
-                                                 developers, CI ───┘ pull
+ Docker Hub (your org)                  Artifactory
+ dhi-<name>               image  ┐
+ Scout registry     attestations ┘─ sync ─▶  <jfrog-repo>  ◀── developers, CI pull
 ```
 
-The image is on Docker Hub, but its signed attestations (SBOM, provenance, VEX,
-scan results) are in Docker's Scout registry. The sync copies both into one
-Artifactory repository, by digest, so they stay verifiable and scannable from
-Artifactory alone.
+The image is on Docker Hub, but its signed attestations live in Docker's Scout
+registry (`registry.scout.docker.com`). The sync copies both into one Artifactory
+repository, by digest, so everything stays verifiable from Artifactory alone.
+A plain `docker pull` / `docker push` would copy the image without them.
 
-The repository name is a setting in `.env`.
+## Before you start
 
-## Prerequisites
-
-Only needed to run from your machine. GitHub Actions installs what it needs.
-
-| Tool | Install (macOS) |
-|---|---|
-| `regctl`, `regsync` | `brew install regclient` |
-| `cosign` ≥ 2.2 | `brew install cosign` |
-| `jq`, `curl` | `brew install jq` |
-| Docker Desktop | docker.com (Docker Scout, included, is optional) |
+- DHI is already mirrored into your Docker Hub organization (a `dhi-<name>`
+  repository, for example `dhi-node`). If not, follow
+  [Mirror a DHI repository](https://docs.docker.com/dhi/how-to/mirror/).
+- You can create an access token for that Docker Hub organization (organization owner).
+- You can create a Docker repository and a token in Artifactory (admin).
+- A GitHub repository for this project (fork or copy it). Enable its workflows in
+  the **Actions** tab if GitHub shows them as disabled.
 
 ## Setup
 
-### 1. Artifactory repositories
+### 1. Create the Artifactory repository
 
-| Where | Name | Purpose |
-|---|---|---|
-| Docker Hub | `dhi-<name>` | Your organization's mirror of the DHI repository. The sync reads from it. |
-| JFrog Artifactory | `<jfrog-repo>` (`JFROG_REPO`) | The Docker repository the sync writes to. Developers and CI pull from it. |
+Create a **Docker** repository in Artifactory. Its name is `<jfrog-repo>` below.
+Give the sync account **Read, Deploy/Cache and Delete/Overwrite** on it (DHI
+re-points tags on every CVE rebuild, so overwrite is required). CI and developers
+need **Read**.
 
-Permissions on the JFrog repository:
+### 2. Create two tokens
 
-| Account | Permissions |
-|---|---|
-| Sync | Read, Deploy/Cache, **Delete/Overwrite** (DHI re-points tags on every CVE rebuild) |
-| CI, developers | Read |
+Mirroring needs only these two.
 
-### 2. Tokens
+| Token | Create it at | Settings | Used to |
+|---|---|---|---|
+| **Docker organization access token (OAT)** | Docker Hub → your organization → **Settings → Access tokens → Generate token** ([docs](https://docs.docker.com/security/access-tokens/organization-access-tokens/#create-an-organization-access-token)) | Repository access: the `dhi-*` repositories. Scope: **Image Pull** only. | read the image from Docker Hub **and** the attestations from the Scout registry |
+| **Artifactory token** | Artifactory → your repository → **Set Me Up** → generate a token ([docs](https://jfrog.com/help/r/jfrog-platform-administration-documentation/access-tokens)) | Use the token itself, not the base64 `auth` value Set Me Up shows. | write to `<jfrog-repo>` |
 
-**Docker organization access token (OAT)**, used by the sync to read from Docker Hub.
-Docker Hub → organization → **Settings → Access tokens → Generate token**
-([docs](https://docs.docker.com/security/access-tokens/organization-access-tokens/#create-an-organization-access-token)).
-Repository access: the mirrored `dhi-*` repositories, scope **Image Pull**. No other scopes
-([reference](https://docs.docker.com/security/access-tokens/reference/#repository-scopes)).
-The same token reads the attestations from `registry.scout.docker.com`.
-Goes into `.env` as `DOCKER_TOKEN`. The username for it is `DOCKER_ORG`, the organization name.
+The OAT's username is the **organization name**, not your personal Docker ID.
 
-**Artifactory token**, used by the sync to write.
-Repository → **Set Me Up** → generate a token, or **Edit Profile → Identity Tokens**;
-for a service account use an access token
-([docs](https://jfrog.com/help/r/jfrog-platform-administration-documentation/access-tokens)).
-Use the token itself, not the base64 `auth` value shown for `config.json`.
-Goes into `.env` as `JFROG_TOKEN`, with `JFROG_USER` set to the username shown in **Set Me Up**.
+> A Docker personal access token (PAT) is **not** needed for mirroring. It is only
+> for Docker Scout scans, see [Optional: Docker Scout](#optional-docker-scout-scans).
 
-**Optional: Docker personal access token (PAT).** Only needed to scan with Docker Scout
-(Scout does not accept OATs). Skip it if you scan with another tool, such as Black Duck.
-Docker Hub → account → **Account settings → Personal access tokens → Generate new token**
-([docs](https://docs.docker.com/security/access-tokens/personal-access-tokens/#create)).
-Permission **Repo Read-only**. The account must be a member of the organization.
-Goes into `.env` as `SCOUT_TOKEN`, with `SCOUT_USERNAME` set to your personal Docker ID.
-Mirroring and `make verify` work without it.
+### 3. Add the values to GitHub
 
-### 3. GitHub Actions variables and secrets (run the mirroring in GitHub)
-
-The workflows run the mirroring for you; nothing is installed on your machine. In the
-GitHub repository that holds this project, open **Settings → Secrets and variables → Actions**
-and add:
+In your GitHub repository: **Settings → Secrets and variables → Actions**.
 
 | Tab | Name | Value |
 |---|---|---|
-| **Variables** | `DOCKER_ORG` | Docker Hub organization name |
-| **Variables** | `SRC_IMAGE` | the Hub mirror, for example `dhi-node` |
-| **Variables** | `DEST_IMAGE` | image name in Artifactory (same as `SRC_IMAGE` unless you rename it) |
-| **Variables** | `TAGS` | tags to mirror, space separated, for example `24 24-dev` |
-| **Secrets** | `DOCKER_TOKEN` | the OAT |
-| **Variables** | `JFROG_HOST` | Artifactory hostname, no `https://` |
-| **Variables** | `JFROG_REPO` | the JFrog repository |
-| **Variables** | `JFROG_USER` | username from Set Me Up |
-| **Secrets** | `JFROG_TOKEN` | the Artifactory token |
+| Variables | `DOCKER_ORG` | Docker Hub organization name (also the OAT's username) |
+| Variables | `SRC_IMAGE` | the Hub repository, for example `dhi-node` |
+| Variables | `DEST_IMAGE` | image name in Artifactory (normally the same as `SRC_IMAGE`) |
+| Variables | `TAGS` | tags to mirror, space separated, for example `24 24-dev` |
+| Variables | `JFROG_HOST` | Artifactory hostname without `https://`, for example `acme.jfrog.io` |
+| Variables | `JFROG_REPO` | `<jfrog-repo>` |
+| Variables | `JFROG_USER` | the username shown in Set Me Up |
+| Secrets | `DOCKER_TOKEN` | the OAT |
+| Secrets | `JFROG_TOKEN` | the Artifactory token |
 
-### 4. Local settings (`.env`), to run from your machine
+### 4. Run it
 
-```bash
-cp .env.example .env && chmod 600 .env
-```
-
-Fill in the org, image, tags, Artifactory host and repository keys, and the three
-tokens. Comments in `.env.example` explain where to get each value.
-
-| `.env` variable | Value | Used for |
-|---|---|---|
-| `DOCKER_ORG` | organization name, also the username for the OAT | reading from Docker Hub and the Scout registry |
-| `DOCKER_TOKEN` | **OAT** (Image Pull) | reading from Docker Hub and the Scout registry |
-| `JFROG_HOST` | Artifactory hostname, no `https://` | writing to Artifactory |
-| `JFROG_USER` | username from Set Me Up | writing to Artifactory |
-| `JFROG_TOKEN` | **Artifactory token** | writing to Artifactory |
-| `SCOUT_USERNAME` | your personal Docker ID (optional) | `docker scout` |
-| `SCOUT_TOKEN` | **PAT** (Repo Read-only) (optional) | `docker scout` |
-
-`.env` is git-ignored. The GitHub workflows do not read it.
-
-## Mirror
-
-### Option 1: GitHub Actions
-
-Run the **Mirror DHI → Artifactory** workflow (`.github/workflows/mirror.yml`;
-Actions tab → Run workflow). It installs the tools, logs in, and runs the four
-steps below with the variables and secrets from Setup, step 3. Optionally enter
-tags to mirror; the default is the `TAGS` variable.
-
-### Option 2: from your machine
-
-Needs the tools from Prerequisites and the `.env` file from Setup, step 4.
-
-```bash
-make login     # regctl and docker log in to Docker Hub, the Scout registry and Artifactory
-make inspect   # tags, digests and attestations that will be mirrored
-make mirror    # copy image + attestations into the JFrog repository, by digest
-make verify    # check the result from Artifactory: digests, attestations, signatures
-```
-
-`make mirror` runs the `regctl` command from the Docker docs once per tag:
-
-```bash
-regctl image copy docker.io/<org>/dhi-node@<digest> acme.jfrog.io/<jfrog-repo>/dhi-node:24 \
-  --referrers --referrers-src registry.scout.docker.com/<org>/dhi-node \
-  --referrers-tgt acme.jfrog.io/<jfrog-repo>/dhi-node --force-recursive
-```
-
-`make verify` reads only from Artifactory and checks that each tag's digest equals
-Docker Hub, every attestation from Scout is present, and every signature verifies against Docker's
-DHI key (`keys/dhi-latest.pub`, from `https://registry.scout.docker.com/keyring/dhi/latest.pub`).
-Expected ending:
+**Actions → Mirror DHI → Artifactory → Run workflow.** It copies each tag with its
+attestations, then checks the result from Artifactory. Success ends with:
 
 ```
 ━━ Summary
@@ -156,21 +79,46 @@ Expected ending:
    ✔ image and its signed attestations are in Artifactory
 ```
 
-## Keep in sync
+The check confirms each tag has the same digest as on Docker Hub, every
+attestation is present, and every signature verifies against Docker's DHI key
+(`keys/dhi-latest.pub`).
 
-DHI updates tags in place: a CVE rebuild points the existing tag (even `24.22.2`)
-at a new digest. Run the sync continuously.
+## Keep it up to date
 
-- **regsync**: `make sync-once` (one pass) or `make sync` (runs hourly).
-  Tags are an allow-list in `regsync.yaml`; keep it equal to `TAGS` in `.env`.
-- **GitHub Actions**: `.github/workflows/dhi-jfrog-sync.yml` runs `regsync once`
-  and `make verify` hourly and on demand. Set the variables and secrets from
-  Setup, step 3. The mirror workflow uses the same ones.
-- **On change**: add a [Docker Hub webhook](https://docs.docker.com/docker-hub/repos/manage/webhooks/)
-  on the mirrored repository that triggers the workflow (`repository_dispatch`,
-  type `dhi-updated`). The payload's `dhi_metadata` lists the CVEs fixed.
+DHI re-points tags to new digests on every CVE rebuild (even `24.22.2`), so the
+copy must be refreshed. **Actions → DHI → Artifactory sync** does that every hour
+and can be run on demand. It reads the same variables and secrets as above.
 
-## Use from a laptop
+It syncs the tags in `TAGS`, the same list the mirror uses.
+
+To sync right away when Docker publishes a rebuild, add a
+[Docker Hub webhook](https://docs.docker.com/docker-hub/repos/manage/webhooks/)
+that triggers the workflow (`repository_dispatch`, type `dhi-updated`).
+
+## Using Jenkins
+
+The `Jenkinsfile` runs the same steps as the two workflows. It calls the repo's
+scripts, so nothing else needs porting.
+
+1. **Credentials** (Manage Jenkins → Credentials):
+   - `dhi-docker-oat`: *Secret text*, the OAT.
+   - `dhi-jfrog`: *Username with password*, the Artifactory username and token.
+2. **Job**: New Item → *Pipeline* → *Pipeline script from SCM*, pointing at your
+   copy of this repository, script path `Jenkinsfile`.
+3. **Settings**: edit the `environment` block at the top of the `Jenkinsfile`
+   (`DOCKER_ORG`, `SRC_IMAGE`, `DEST_IMAGE`, `JFROG_HOST`, `JFROG_REPO`; `TAGS` is a
+   job parameter). Same names as in the GitHub table above.
+4. **Agent**: Linux amd64 with `bash`, `curl`, `jq` and the Docker CLI, and access to
+   `docker.io`, `registry.scout.docker.com`, `github.com` (tool download) and your
+   Artifactory host. Without GitHub access, put `regctl`, `regsync` and `cosign`
+   on the agent's `PATH` and remove the *Install tools* stage.
+5. **Run**: *Build with Parameters* → `MODE=mirror` for the first copy. After that
+   the hourly schedule runs `MODE=sync`, which refreshes changed tags in `TAGS`.
+
+No PAT is needed. To sync right away when Docker publishes a rebuild, add a Docker
+Hub webhook that calls the job through the Generic Webhook Trigger plugin.
+
+## Use the images
 
 ```bash
 docker login acme.jfrog.io
@@ -182,70 +130,88 @@ FROM acme.jfrog.io/<jfrog-repo>/dhi-node:24-dev AS build
 FROM acme.jfrog.io/<jfrog-repo>/dhi-node:24
 ```
 
-Optional: scan and inspect attestations with Docker Scout, reading from Artifactory
-(`registry://` prefix):
+Name Artifactory in every `FROM`: Docker's `registry-mirrors` setting only
+applies to Docker Hub pulls. In production, pin by digest
+(`…/dhi-node:24@sha256:…`) and let Renovate or Dependabot bump it. To block other
+registries, use [Registry Access Management](https://docs.docker.com/desktop/enterprise/hardened-desktop/registry-access-management/).
 
-```bash
-IMG=registry://acme.jfrog.io/<jfrog-repo>/dhi-node:24
-docker scout cves $IMG                                  # "✓ VEX statements obtained from attestation"
-docker scout attest list $IMG --platform linux/amd64    # attached attestations and their predicate types
-docker scout attest get  $IMG --platform linux/amd64 --predicate \
-  --predicate-type https://openvex.dev/ns/v0.2.0        # the VEX document; same for the SBOM, provenance
-docker scout attest get  $IMG --platform linux/amd64 --verify --skip-tlog \
-  --predicate-type https://slsa.dev/provenance/v0.2     # verify Docker's signature on it first
-```
-
-Verify with cosign (DHI signs each attestation, not the image index):
+Verify Docker's signature on an attestation (DHI signs each attestation, not the
+image index):
 
 ```bash
 regctl artifact list acme.jfrog.io/<jfrog-repo>/dhi-node:24 --platform linux/amd64 \
-  --filter-annotation in-toto.io/predicate-type=https://slsa.dev/provenance/v0.2   # Name: ...@sha256:<att>
+  --filter-annotation in-toto.io/predicate-type=https://slsa.dev/provenance/v0.2   # prints ...@sha256:<att>
 cosign verify --key keys/dhi-latest.pub --insecure-ignore-tlog=true --experimental-oci11 \
   acme.jfrog.io/<jfrog-repo>/dhi-node@sha256:<att>
 ```
 
-Make targets:
+## Optional: Docker Scout scans
 
-- `make use`: pull and run, export SBOM and VEX to `out/`, scan with Scout (the Scout scan is optional and skipped without a PAT).
-- `make app`: verify the base's signed provenance, pin it by digest, build an
-  app from Artifactory, run it.
+Only if you scan images with Docker Scout. If you use another scanner (for
+example Black Duck), skip this section: **mirroring and verification never use it.**
 
-Reference Artifactory explicitly in Dockerfiles and manifests; Docker's
-`registry-mirrors` setting applies to Docker Hub pulls only. To block other
-registries use [Registry Access Management](https://docs.docker.com/desktop/enterprise/hardened-desktop/registry-access-management/).
+Docker Scout does not accept organization tokens, so it needs a **personal access
+token (PAT)**: Docker Hub → your avatar → **Account settings → Personal access
+tokens → Generate new token**, permission **Repo Read-only**
+([docs](https://docs.docker.com/security/access-tokens/personal-access-tokens/#create)).
+The account must be a member of the organization.
 
-## Use from CI
+```bash
+docker login -u <your-docker-id>        # paste the PAT
+IMG=registry://acme.jfrog.io/<jfrog-repo>/dhi-node:24     # registry:// = read from Artifactory
+docker scout cves $IMG                  # "✓ VEX statements obtained from attestation"
+docker scout attest list $IMG --platform linux/amd64
+```
 
-In an application pipeline, pull the base from Artifactory, build with
-`--sbom=true --provenance=mode=max`, and scan with Docker Scout.
-
-Max provenance is required: Scout follows it to the DHI base and applies its VEX
+When you build your own images on DHI, build with `--sbom=true --provenance=mode=max`
+so Scout can follow the provenance back to the DHI base and apply its VEX
 ([docs](https://docs.docker.com/dhi/how-to/scan/#build-child-images-with-provenance-attestations)).
 
-Pin base images by digest in production (`FROM …/dhi-node:24@sha256:…`) and let
-Renovate or Dependabot bump them.
+## Run from your machine instead
+
+Install: `brew install regclient cosign jq` and Docker Desktop (other platforms:
+the same tools from their releases).
+
+```bash
+cp .env.example .env && chmod 600 .env   # fill it in: the same names as the GitHub table above
+make login      # log in to Docker Hub, the Scout registry and Artifactory
+make inspect    # tags, digests and attestations that will be mirrored
+make mirror     # copy image + attestations into Artifactory, by digest
+make verify     # check digests, attestations and signatures from Artifactory
+make sync-once  # one pass of the continuous sync (make sync: every hour)
+```
+
+`.env` is git-ignored. `SCOUT_USERNAME` and `SCOUT_TOKEN` in `.env` are optional
+(Docker Scout only).
+
+`make mirror` is the `regctl` command from the Docker docs, once per tag:
+
+```bash
+regctl image copy docker.io/<org>/dhi-node@<digest> acme.jfrog.io/<jfrog-repo>/dhi-node:24 \
+  --referrers --referrers-src registry.scout.docker.com/<org>/dhi-node \
+  --referrers-tgt acme.jfrog.io/<jfrog-repo>/dhi-node --force-recursive
+```
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| `cannot read attestations from registry.scout.docker.com/…: unauthorized` | Run `make login`; the OAT needs Image Pull on that repository. |
+| `failed to ping registry docker.io: unauthorized` | `DOCKER_ORG` must be the organization name (not your Docker ID) and `DOCKER_TOKEN` an organization access token. |
+| `cannot read attestations from registry.scout.docker.com/…: unauthorized` | The OAT needs **Image Pull** on that `dhi-*` repository. |
 | Push rejected / `403` on an existing tag | Give the sync account Delete/Overwrite on the JFrog repository. |
-| Attestations missing after mirroring | Make sure `JFROG_REPO` is a Docker repository the sync account can push to. |
-| Digest in Artifactory differs from Hub | Docker re-pointed the tag. Run `make sync-once`. |
-| `↻ changed upstream since copy` in `make verify` | Docker re-issued an attestation. Run `make mirror` again. |
-| `no DHI-signed provenance in Artifactory - not building on it` | Mirror that tag (`TAGS` and `regsync.yaml`), or re-check the key with `make inspect`. |
-| `docker scout` authentication error (only if you use Scout) | Set `SCOUT_USERNAME`/`SCOUT_TOKEN` (Docker ID + PAT), run `make login`. |
+| Attestations missing after mirroring | `JFROG_REPO` must be a Docker repository the sync account can push to. |
+| Digest in Artifactory differs from Hub | Docker re-pointed the tag. Run the sync again. |
+| `↻ changed upstream since copy` | Docker re-issued an attestation. Run the mirror again. |
+| `docker scout` authentication error | Scout needs a Docker ID + PAT, not the OAT. See [Optional: Docker Scout](#optional-docker-scout-scans). |
 
 ## Files
 
 | Path | Purpose |
 |---|---|
-| `.env.example` | All settings |
-| `Makefile` | `make help` lists the targets |
-| `scripts/01-login.sh` … `04-verify.sh` | login, inspect, mirror, verify |
-| `scripts/05-use.sh`, `06-app.sh` | use from a laptop, build an app |
-| `regsync.yaml` | continuous sync |
 | `.github/workflows/mirror.yml` | one-off mirror + verify (manual run) |
-| `.github/workflows/dhi-jfrog-sync.yml` | scheduled sync + verify |
+| `.github/workflows/dhi-jfrog-sync.yml` | hourly sync + verify |
+| `Jenkinsfile` | the same, for Jenkins |
+| `regsync.yaml` | sync settings (tag allow-list is generated from `TAGS`) |
+| `scripts/`, `Makefile` | the same steps for your machine (`make help`) |
+| `.env.example` | settings for running from your machine |
 | `keys/dhi-latest.pub` | Docker's DHI signing key |
