@@ -97,7 +97,7 @@ Or run it from GitHub: **Actions → Mirror DHI into Docker Hub → Run workflow
 `DOCKER_TOKEN` secret for an API token, and mirrors `DHI_SOURCE` (for example
 `node`) into `<DHI_ORG>/<SRC_IMAGE>`. Add the variables and secret from step 4 first.
 `DHI_SOURCE` is optional: it defaults to `SRC_IMAGE` without the `dhi-` prefix.
-To mirror a different image for one run, type `src_image` (and `dhi_source` if the
+To mirror a different image for one run, type `src_image` (a name starting with `dhi-`, and `dhi_source` if the
 names differ) in **Run workflow**: they win over the variables for that run.
 
 `DHI_ORG` and `DHI_API_TOKEN` are the names `dhictl` reads. `DHI_API_TOKEN` is the
@@ -123,7 +123,7 @@ In your GitHub repository: **Settings → Secrets and variables → Actions**.
 | Tab | Name | Value |
 |---|---|---|
 | Variables | `DHI_ORG` | Docker Hub organization name (also the OAT's username) |
-| Variables | `SRC_IMAGE` | the Hub repository, for example `dhi-node` |
+| Variables | `SRC_IMAGE` | the Hub repository; the name starts with `dhi-`, for example `dhi-node` |
 | Variables | `DHI_SOURCE` | optional, only for the Docker Hub mirror workflow: the image's name in the DHI catalog, for example `node` (default: `SRC_IMAGE` without `dhi-`) |
 | Variables | `DEST_IMAGE` | image name in Artifactory (normally the same as `SRC_IMAGE`) |
 | Variables | `TAGS` | tags to mirror, space separated, for example `24 24-dev` |

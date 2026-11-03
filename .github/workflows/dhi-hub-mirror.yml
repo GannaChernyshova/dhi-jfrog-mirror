@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       src_image:
-        description: "Repository to create in your organization, for example dhi-node (default: the SRC_IMAGE variable)"
+        description: "Repository to create in your organization. Must start with dhi-, for example dhi-node (default: the SRC_IMAGE variable)"
         required: false
         type: string
       dhi_source:
@@ -31,7 +31,7 @@ jobs:
       DHI_ORG: ${{ vars.DHI_ORG }}          # Docker Hub organization
       # A value typed in "Run workflow" wins over the repository variable.
       DHI_SOURCE: ${{ inputs.dhi_source || vars.DHI_SOURCE }}   # image in the DHI catalog, for example: node (optional: defaults to SRC_IMAGE without "dhi-")
-      SRC_IMAGE: ${{ inputs.src_image || vars.SRC_IMAGE }}      # repository to create in your organization, for example: dhi-node
+      SRC_IMAGE: ${{ inputs.src_image || vars.SRC_IMAGE }}      # repository to create in your organization, must start with dhi-, for example: dhi-node
       DHICTL_VERSION: v0.0.10
     steps:
       - name: Install dhictl
@@ -63,7 +63,24 @@ jobs:
           for v in DHI_ORG SRC_IMAGE; do
             [ -n "${!v}" ] || { echo "::error::Set $v: as a repository variable (Settings → Secrets and variables → Actions → Variables) or, for SRC_IMAGE, in Run workflow."; exit 1; }
           done
+          case "$SRC_IMAGE" in dhi-?*) ;; *)
+            echo "::error::SRC_IMAGE must start with dhi- (for example dhi-node), not '$SRC_IMAGE'."; exit 1 ;;
+          esac
           source="${DHI_SOURCE:-${SRC_IMAGE#dhi-}}"   # dhi-node → node
+          case "$source" in dhi-?*)
+            echo "::warning::DHI_SOURCE is the catalog name without the dhi- prefix: using '${source#dhi-}', not '$source'."
+            source="${source#dhi-}" ;;
+          esac
+
+          # `mirror start` fails if the repository is already a mirror: make a re-run harmless.
+          existing=$(dhictl mirror list --org "$DHI_ORG" --filter "$SRC_IMAGE" --json || true)
+          if jq -e --arg d "$SRC_IMAGE" --arg org "$DHI_ORG" \
+               '[.. | strings] | any(. == $d or . == ($org + "/" + $d))' <<<"$existing" >/dev/null 2>&1; then
+            echo "::notice::$DHI_ORG/$SRC_IMAGE is already a mirror, nothing to do. To change its source, stop the mirror in Docker Hub (Hardened Images → Manage) first."
+            jq . <<<"$existing"
+            exit 0
+          fi
+
           echo "Mirroring dhi/$source into $DHI_ORG/$SRC_IMAGE"
           dhictl mirror start --org "$DHI_ORG" "$source,$SRC_IMAGE"
 
