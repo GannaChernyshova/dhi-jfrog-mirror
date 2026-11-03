@@ -32,7 +32,7 @@ Repository names are settings in `.env`. The minimum is one local repository.
 | `regctl`, `regsync` | `brew install regclient` |
 | `cosign` ≥ 2.2 | `brew install cosign` |
 | `jq`, `curl` | `brew install jq` |
-| Docker Desktop (includes Docker Scout) | docker.com |
+| Docker Desktop | docker.com (Docker Scout, included, is optional) |
 
 ## Setup
 
@@ -61,11 +61,13 @@ Repository access: the mirrored `dhi-*` repositories, scope **Image Pull**. No o
 The same token reads the attestations from `registry.scout.docker.com`.
 Goes into `.env` as `DOCKER_TOKEN`, with `DOCKER_USERNAME` set to the organization name.
 
-**Docker personal access token (PAT)**, used by Docker Scout (Scout does not accept OATs).
+**Docker personal access token (PAT), optional.** Only needed to scan with Docker Scout
+(Scout does not accept OATs). Skip it if you scan with another tool, such as Black Duck.
 Docker Hub → account → **Account settings → Personal access tokens → Generate new token**
 ([docs](https://docs.docker.com/security/access-tokens/personal-access-tokens/#create)).
 Permission **Repo Read-only**. The account must be a member of the organization.
 Goes into `.env` as `SCOUT_TOKEN`, with `SCOUT_USERNAME` set to your personal Docker ID.
+Mirroring and `make verify` work without it.
 
 **Artifactory token**, used by the sync to write.
 Repository → **Set Me Up** → generate a token, or **Edit Profile → Identity Tokens**;
@@ -87,8 +89,8 @@ tokens. Comments in `.env.example` explain where to get each value.
 |---|---|---|
 | `DOCKER_USERNAME` | organization name | reading from Docker Hub and the Scout registry |
 | `DOCKER_TOKEN` | **OAT** (Image Pull) | reading from Docker Hub and the Scout registry |
-| `SCOUT_USERNAME` | your personal Docker ID | `docker scout` |
-| `SCOUT_TOKEN` | **PAT** (Repo Read-only) | `docker scout` |
+| `SCOUT_USERNAME` | your personal Docker ID (optional) | `docker scout` |
+| `SCOUT_TOKEN` | **PAT** (Repo Read-only) (optional) | `docker scout` |
 | `JFROG_HOST` | Artifactory hostname, no `https://` | writing to Artifactory |
 | `JFROG_USER` | username from Set Me Up | writing to Artifactory |
 | `JFROG_TOKEN` | **Artifactory token** | writing to Artifactory |
@@ -110,8 +112,8 @@ that holds this project: **Settings → Secrets and variables → Actions**.
 
 Tokens go in **Secrets**, never in Variables. The workflows read the image and its
 attestations (from `registry.scout.docker.com`) with `DOCKER_TOKEN`, so
-`SCOUT_USERNAME` and `SCOUT_TOKEN` are not needed. They are only for the
-`docker scout` CLI (`make use`); add them as well if you add a scan step.
+`SCOUT_USERNAME` and `SCOUT_TOKEN` are not needed. They are optional and only for the
+`docker scout` CLI (`make use`); add them as well if you add a Scout scan step.
 
 Or set them all from `.env` with the [GitHub CLI](https://cli.github.com/)
 (`gh auth login` first; run it inside the cloned repository, or add `-R <owner>/<repo>`):
@@ -194,7 +196,7 @@ FROM acme.jfrog.io/docker/dhi-node:24-dev AS build
 FROM acme.jfrog.io/docker/dhi-node:24
 ```
 
-Scan and inspect attestations with Docker Scout, reading from Artifactory
+Optional: scan and inspect attestations with Docker Scout, reading from Artifactory
 (`registry://` prefix):
 
 ```bash
@@ -218,7 +220,7 @@ cosign verify --key keys/dhi-latest.pub --insecure-ignore-tlog=true --experiment
 
 Make targets:
 
-- `make use`: pull and run, export SBOM and VEX to `out/`, scan with Scout.
+- `make use`: pull and run, export SBOM and VEX to `out/`, scan with Scout (the Scout scan is optional and skipped without a PAT).
 - `make app`: verify the base's signed provenance, pin it by digest, build an
   app from Artifactory, run it.
 
@@ -248,7 +250,7 @@ Renovate or Dependabot bump them.
 | `↻ changed upstream since copy` in `make verify` | Docker re-issued an attestation. Run `make mirror` again. |
 | `make verify` passes for the DHI repository but not via `docker` | Add the DHI repository to the virtual repo, or grant Read on it. |
 | `no DHI-signed provenance in Artifactory - not building on it` | Mirror that tag (`TAGS` and `regsync.yaml`), or re-check the key with `make inspect`. |
-| `docker scout` authentication error | Set `SCOUT_USERNAME`/`SCOUT_TOKEN` (Docker ID + PAT), run `make login`. |
+| `docker scout` authentication error (only if you use Scout) | Set `SCOUT_USERNAME`/`SCOUT_TOKEN` (Docker ID + PAT), run `make login`. |
 
 ## Files
 
