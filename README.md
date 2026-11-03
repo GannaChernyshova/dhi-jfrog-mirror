@@ -145,6 +145,30 @@ cosign verify --key keys/dhi-latest.pub --insecure-ignore-tlog=true --experiment
   acme.jfrog.io/<jfrog-repo>/dhi-node@sha256:<att>
 ```
 
+## Run from your machine instead
+
+Install: `brew install regclient cosign jq` and Docker Desktop (other platforms:
+the same tools from their releases).
+
+```bash
+cp .env.example .env && chmod 600 .env   # fill it in: the same names as the GitHub table above
+make login      # log in to Docker Hub, the Scout registry and Artifactory
+make inspect    # tags, digests and attestations that will be mirrored
+make mirror     # copy image + attestations into Artifactory, by digest
+make verify     # check digests, attestations and signatures from Artifactory
+make sync-once  # one pass of the continuous sync (make sync: every hour)
+```
+
+`.env` is git-ignored.
+
+`make mirror` is the `regctl` command from the Docker docs, once per tag:
+
+```bash
+regctl image copy docker.io/<org>/dhi-node@<digest> acme.jfrog.io/<jfrog-repo>/dhi-node:24 \
+  --referrers --referrers-src registry.scout.docker.com/<org>/dhi-node \
+  --referrers-tgt acme.jfrog.io/<jfrog-repo>/dhi-node --force-recursive
+```
+
 ## Optional: Docker Scout scans
 
 Only if you scan images with Docker Scout. If you use another scanner (for
@@ -166,31 +190,6 @@ docker scout attest list $IMG --platform linux/amd64
 When you build your own images on DHI, build with `--sbom=true --provenance=mode=max`
 so Scout can follow the provenance back to the DHI base and apply its VEX
 ([docs](https://docs.docker.com/dhi/how-to/scan/#build-child-images-with-provenance-attestations)).
-
-## Run from your machine instead
-
-Install: `brew install regclient cosign jq` and Docker Desktop (other platforms:
-the same tools from their releases).
-
-```bash
-cp .env.example .env && chmod 600 .env   # fill it in: the same names as the GitHub table above
-make login      # log in to Docker Hub, the Scout registry and Artifactory
-make inspect    # tags, digests and attestations that will be mirrored
-make mirror     # copy image + attestations into Artifactory, by digest
-make verify     # check digests, attestations and signatures from Artifactory
-make sync-once  # one pass of the continuous sync (make sync: every hour)
-```
-
-`.env` is git-ignored. `SCOUT_USERNAME` and `SCOUT_TOKEN` in `.env` are optional
-(Docker Scout only).
-
-`make mirror` is the `regctl` command from the Docker docs, once per tag:
-
-```bash
-regctl image copy docker.io/<org>/dhi-node@<digest> acme.jfrog.io/<jfrog-repo>/dhi-node:24 \
-  --referrers --referrers-src registry.scout.docker.com/<org>/dhi-node \
-  --referrers-tgt acme.jfrog.io/<jfrog-repo>/dhi-node --force-recursive
-```
 
 ## Troubleshooting
 
