@@ -11,8 +11,8 @@ need regctl "https://github.com/regclient/regclient/releases"
 
 step "Docker Hub (image) and Scout registry (attestations)"
 for reg in docker.io registry.scout.docker.com; do
-  printf '%s' "$DOCKER_TOKEN" | regctl registry login -u "$DOCKER_ORG" --pass-stdin "$reg" >/dev/null
-  ok "regctl → $reg as $DOCKER_ORG (organization access token)"
+  printf '%s' "$DOCKER_TOKEN" | regctl registry login -u "$DHI_ORG" --pass-stdin "$reg" >/dev/null
+  ok "regctl → $reg as $DHI_ORG (organization access token)"
 done
 
 step "Artifactory ($JFROG_HOST)"

@@ -1,0 +1,55 @@
+name: Mirror DHI into Docker Hub
+
+# Step 1 of the README, with the dhictl CLI: mirror a Docker Hardened Image from
+# the DHI catalog into your Docker Hub organization (<org>/<SRC_IMAGE>). Run it
+# once per image. Docker keeps the mirror up to date afterwards; the
+# "Mirror DHI → Artifactory" workflow then copies it into Artifactory.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: dhi-hub-mirror
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    env:
+      # Repository variables (Settings → Secrets and variables → Actions → Variables)
+      DHI_ORG: ${{ vars.DHI_ORG }}          # Docker Hub organization
+      DHI_SOURCE: ${{ vars.DHI_SOURCE }}    # image in the DHI catalog, for example: node
+      SRC_IMAGE: ${{ vars.SRC_IMAGE }}      # repository to create in your organization, for example: dhi-node
+      DHICTL_VERSION: v0.0.10
+    steps:
+      - name: Install dhictl
+        run: |
+          base="https://github.com/docker-hardened-images/dhictl/releases/download/${DHICTL_VERSION}"
+          curl -fsSL -o dhictl "$base/dhictl-linux-amd64"
+          curl -fsSL -o checksums.txt "$base/dhictl_${DHICTL_VERSION}_checksums.txt"
+          grep ' dhictl-linux-amd64$' checksums.txt | sed 's/dhictl-linux-amd64$/dhictl/' | sha256sum -c -
+          sudo install -m 0755 dhictl /usr/local/bin/dhictl
+
+      # dhictl needs a short-lived API token, obtained by exchanging the
+      # organization access token (identifier = organization name).
+      - name: Get a dhictl API token
+        env:
+          ORG_TOKEN: ${{ secrets.DOCKER_TOKEN }}   # Repository secret
+        run: |
+          body=$(jq -n --arg id "$DHI_ORG" --arg secret "$ORG_TOKEN" '{identifier: $id, secret: $secret}')
+          token=$(curl -fsS -X POST https://hub.docker.com/v2/auth/token \
+            -H "Content-Type: application/json" -d "$body" | jq -r .access_token)
+          if [ -z "$token" ] || [ "$token" = null ]; then
+            echo "::error::Could not get an API token. DHI_ORG must be the organization name and DOCKER_TOKEN an organization access token."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "DHI_API_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Start mirror
+        run: dhictl mirror start --org "$DHI_ORG" "${DHI_SOURCE},${SRC_IMAGE}"
+
+      - name: Show the mirror
+        run: dhictl mirror list --org "$DHI_ORG" --filter "$SRC_IMAGE" --json

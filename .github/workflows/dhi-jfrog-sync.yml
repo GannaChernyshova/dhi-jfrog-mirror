@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Repository variables (Settings → Secrets and variables → Actions → Variables)
-      DOCKER_ORG: ${{ vars.DOCKER_ORG }}
+      DHI_ORG: ${{ vars.DHI_ORG }}
       SRC_IMAGE: ${{ vars.SRC_IMAGE }}
       DEST_IMAGE: ${{ vars.DEST_IMAGE }}
       TAGS: ${{ vars.TAGS }}

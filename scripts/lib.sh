@@ -10,7 +10,7 @@ if [ -f "$ROOT/.env" ]; then
   set +a
 fi
 
-DOCKER_ORG="${DOCKER_ORG:-}"
+DHI_ORG="${DHI_ORG:-}"
 SRC_IMAGE="${SRC_IMAGE:-dhi-node}"
 DEST_IMAGE="${DEST_IMAGE:-$SRC_IMAGE}"
 TAGS="${TAGS:-24}"
@@ -18,8 +18,8 @@ TAGS="${TAGS:-24}"
 # Source: the DHI repo mirrored into your Hub org. The image is on docker.io;
 # its signed attestations (SBOM, provenance, VEX, ...) are in the Scout
 # registry under the same org/repo name.
-SRC="docker.io/${DOCKER_ORG}/${SRC_IMAGE}"
-ATT_SRC="registry.scout.docker.com/${DOCKER_ORG}/${SRC_IMAGE}"
+SRC="docker.io/${DHI_ORG}/${SRC_IMAGE}"
+ATT_SRC="registry.scout.docker.com/${DHI_ORG}/${SRC_IMAGE}"
 
 # Destination in Artifactory (repository-path method: <host>/<repo-key>/<image>).
 #   DEST  the repo the sync writes to (developers and CI pull from it too)
@@ -48,7 +48,7 @@ need() { type -P "$1" >/dev/null 2>&1 || die "missing tool: $1 ($2)"; }
 # for docker.io than regctl's own config (expected here: Scout uses a PAT,
 # the sync an OAT). Only errors are useful.
 regctl() { command regctl -v error "$@"; }
-need_source() { [ -n "$DOCKER_ORG" ] || die "set DOCKER_ORG in .env (your Docker Hub org that holds the DHI mirror)"; }
+need_source() { [ -n "$DHI_ORG" ] || die "set DHI_ORG in .env (your Docker Hub org that holds the DHI mirror)"; }
 
 # Platform manifests of an index as "os/arch digest" lines.
 platforms() {

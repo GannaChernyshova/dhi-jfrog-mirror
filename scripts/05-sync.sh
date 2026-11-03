@@ -11,7 +11,7 @@ need regsync "https://github.com/regclient/regclient/releases"
 need_source
 : "${DOCKER_TOKEN:?set DOCKER_TOKEN in .env}" "${JFROG_USER:?set JFROG_USER in .env}" "${JFROG_TOKEN:?set JFROG_TOKEN in .env}"
 [ -n "${TAGS// /}" ] || die "TAGS is empty: a DHI repository has thousands of tags, list the ones to sync"
-export DOCKER_ORG SRC_IMAGE DEST_IMAGE JFROG_HOST JFROG_REPO DOCKER_TOKEN JFROG_USER JFROG_TOKEN
+export DHI_ORG SRC_IMAGE DEST_IMAGE JFROG_HOST JFROG_REPO DOCKER_TOKEN JFROG_USER JFROG_TOKEN
 
 cfg=$(mktemp)
 trap 'rm -f "$cfg"' EXIT

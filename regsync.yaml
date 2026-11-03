@@ -9,10 +9,10 @@ version: 1
 
 creds:
   - registry: docker.io
-    user: '{{env "DOCKER_ORG"}}'
+    user: '{{env "DHI_ORG"}}'
     pass: '{{env "DOCKER_TOKEN"}}'
   - registry: registry.scout.docker.com
-    user: '{{env "DOCKER_ORG"}}'
+    user: '{{env "DHI_ORG"}}'
     pass: '{{env "DOCKER_TOKEN"}}'
   - registry: '{{env "JFROG_HOST"}}'
     user: '{{env "JFROG_USER"}}'
@@ -23,12 +23,12 @@ defaults:
   interval: 60m
 
 sync:
-  - source: 'docker.io/{{env "DOCKER_ORG"}}/{{env "SRC_IMAGE"}}'
+  - source: 'docker.io/{{env "DHI_ORG"}}/{{env "SRC_IMAGE"}}'
     target: '{{env "JFROG_HOST"}}/{{env "JFROG_REPO"}}/{{env "DEST_IMAGE"}}'
     type: repository
     # Attestations live in the Scout registry, not next to the image on Hub.
     referrers: true
-    referrerSource: 'registry.scout.docker.com/{{env "DOCKER_ORG"}}/{{env "SRC_IMAGE"}}'
+    referrerSource: 'registry.scout.docker.com/{{env "DHI_ORG"}}/{{env "SRC_IMAGE"}}'
     referrerTarget: '{{env "JFROG_HOST"}}/{{env "JFROG_REPO"}}/{{env "DEST_IMAGE"}}'
     # Tag filters are regular expressions and are not templated, so
     # scripts/05-sync.sh fills in one '^tag$' line per tag in TAGS. A DHI repo

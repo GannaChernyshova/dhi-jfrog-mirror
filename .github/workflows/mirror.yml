@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Repository variables (Settings → Secrets and variables → Actions → Variables)
-      DOCKER_ORG: ${{ vars.DOCKER_ORG }}
+      DHI_ORG: ${{ vars.DHI_ORG }}
       SRC_IMAGE: ${{ vars.SRC_IMAGE }}
       DEST_IMAGE: ${{ vars.DEST_IMAGE }}
       TAGS: ${{ inputs.tags || vars.TAGS }}
@@ -47,14 +47,14 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKER_ORG }}
+          username: ${{ vars.DHI_ORG }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
       - name: Log in to the Scout registry (attestations)
         uses: docker/login-action@v3
         with:
           registry: registry.scout.docker.com
-          username: ${{ vars.DOCKER_ORG }}
+          username: ${{ vars.DHI_ORG }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
       - name: Log in to Artifactory

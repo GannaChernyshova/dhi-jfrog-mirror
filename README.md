@@ -20,24 +20,63 @@ A plain `docker pull` / `docker push` would copy the image without them.
 
 ## Before you start
 
-- DHI is already mirrored into your Docker Hub organization (a `dhi-<name>`
-  repository, for example `dhi-node`). If not, follow
-  [Mirror a DHI repository](https://docs.docker.com/dhi/how-to/mirror/).
-- You can create an access token for that Docker Hub organization (organization owner).
+- A Docker Hub organization with a DHI Select or Enterprise subscription (or an
+  active trial), and you can create access tokens for it (organization owner).
 - You can create a Docker repository and a token in Artifactory (admin).
 - A GitHub repository for this project (fork or copy it). Enable its workflows in
   the **Actions** tab if GitHub shows them as disabled.
 
 ## Setup
 
-### 1. Create the Artifactory repository
+### 1. Mirror DHI into your Docker Hub organization
+
+Skip this if your organization already has the `dhi-<name>` repository (for
+example `dhi-node`). Do it once per image, with the `dhictl` CLI
+([docs](https://docs.docker.com/dhi/how-to/mirror/)).
+
+Install: download `dhictl` for your platform from the
+[releases page](https://github.com/docker-hardened-images/dhictl/releases) and put
+it on your `PATH` (`mv dhictl /usr/local/bin/`). Docker Desktop 4.65+ already has
+the same commands as `docker dhi`.
+
+```bash
+export DHI_ORG=<org>                      # dhictl reads the organization from here
+# Log in: exchange an organization access token for a short-lived API token
+export DHI_API_TOKEN=$(curl -s -X POST https://hub.docker.com/v2/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"identifier": "'$DHI_ORG'", "secret": "<org-token>"}' | jq -r .access_token)
+
+# Mirror dhi/node into <org>/dhi-node, then check it
+dhictl mirror start dhi/node,$DHI_ORG/dhi-node
+dhictl mirror list
+```
+
+Or run it from GitHub: **Actions → Mirror DHI into Docker Hub → Run workflow**
+(`.github/workflows/dhi-hub-mirror.yml`). It installs `dhictl`, exchanges the
+`DOCKER_TOKEN` secret for an API token, and mirrors `DHI_SOURCE` (for example
+`node`) into `<DHI_ORG>/<SRC_IMAGE>`. Add the variables and secret from step 4 first,
+plus the variable `DHI_SOURCE`.
+
+`DHI_ORG` and `DHI_API_TOKEN` are the names `dhictl` reads. `DHI_API_TOKEN` is the
+short-lived API token from the exchange above, not your organization access token,
+which this project calls `DOCKER_TOKEN`.
+
+Creating a new mirror repository needs a token with organization-wide repository
+access; the sync token in step 3 only needs Image Pull. Use a separate, short-lived
+token for this one-time step. For the workflow, put that token in the `DOCKER_TOKEN`
+secret for the run, then replace it with the Image Pull token.
+
+Once `<org>/dhi-node` exists, note its tags (Docker Hub → the repository → Tags):
+they go in `TAGS` below.
+
+### 2. Create the Artifactory repository
 
 Create a **Docker** repository in Artifactory. Its name is `<jfrog-repo>` below.
 Give the sync account **Read, Deploy/Cache and Delete/Overwrite** on it (DHI
 re-points tags on every CVE rebuild, so overwrite is required). CI and developers
 need **Read**.
 
-### 2. Create two tokens
+### 3. Create two tokens
 
 Mirroring needs only these two.
 
@@ -51,14 +90,15 @@ The OAT's username is the **organization name**, not your personal Docker ID.
 > A Docker personal access token (PAT) is **not** needed for mirroring. It is only
 > for Docker Scout scans, see [Optional: Docker Scout](#optional-docker-scout-scans).
 
-### 3. Add the values to GitHub
+### 4. Add the values to GitHub
 
 In your GitHub repository: **Settings → Secrets and variables → Actions**.
 
 | Tab | Name | Value |
 |---|---|---|
-| Variables | `DOCKER_ORG` | Docker Hub organization name (also the OAT's username) |
+| Variables | `DHI_ORG` | Docker Hub organization name (also the OAT's username) |
 | Variables | `SRC_IMAGE` | the Hub repository, for example `dhi-node` |
+| Variables | `DHI_SOURCE` | only for the Docker Hub mirror workflow: the image's name in the DHI catalog, for example `node` |
 | Variables | `DEST_IMAGE` | image name in Artifactory (normally the same as `SRC_IMAGE`) |
 | Variables | `TAGS` | tags to mirror, space separated, for example `24 24-dev` |
 | Variables | `JFROG_HOST` | Artifactory hostname without `https://`, for example `acme.jfrog.io` |
@@ -67,7 +107,7 @@ In your GitHub repository: **Settings → Secrets and variables → Actions**.
 | Secrets | `DOCKER_TOKEN` | the OAT |
 | Secrets | `JFROG_TOKEN` | the Artifactory token |
 
-### 4. Run it
+### 5. Run it
 
 **Actions → Mirror DHI → Artifactory → Run workflow.** It copies each tag with its
 attestations, then checks the result from Artifactory. Success ends with:
@@ -106,7 +146,7 @@ scripts, so nothing else needs porting.
 2. **Job**: New Item → *Pipeline* → *Pipeline script from SCM*, pointing at your
    copy of this repository, script path `Jenkinsfile`.
 3. **Settings**: edit the `environment` block at the top of the `Jenkinsfile`
-   (`DOCKER_ORG`, `SRC_IMAGE`, `DEST_IMAGE`, `JFROG_HOST`, `JFROG_REPO`; `TAGS` is a
+   (`DHI_ORG`, `SRC_IMAGE`, `DEST_IMAGE`, `JFROG_HOST`, `JFROG_REPO`; `TAGS` is a
    job parameter). Same names as in the GitHub table above.
 4. **Agent**: Linux amd64 with `bash`, `curl`, `jq` and the Docker CLI, and access to
    `docker.io`, `registry.scout.docker.com`, `github.com` (tool download) and your
@@ -195,7 +235,7 @@ so Scout can follow the provenance back to the DHI base and apply its VEX
 
 | Symptom | Fix |
 |---|---|
-| `failed to ping registry docker.io: unauthorized` | `DOCKER_ORG` must be the organization name (not your Docker ID) and `DOCKER_TOKEN` an organization access token. |
+| `failed to ping registry docker.io: unauthorized` | `DHI_ORG` must be the organization name (not your Docker ID) and `DOCKER_TOKEN` an organization access token. |
 | `cannot read attestations from registry.scout.docker.com/…: unauthorized` | The OAT needs **Image Pull** on that `dhi-*` repository. |
 | Push rejected / `403` on an existing tag | Give the sync account Delete/Overwrite on the JFrog repository. |
 | Attestations missing after mirroring | `JFROG_REPO` must be a Docker repository the sync account can push to. |
@@ -207,6 +247,7 @@ so Scout can follow the provenance back to the DHI base and apply its VEX
 
 | Path | Purpose |
 |---|---|
+| `.github/workflows/dhi-hub-mirror.yml` | mirror a DHI image into your Docker Hub org (`dhictl`, manual run) |
 | `.github/workflows/mirror.yml` | one-off mirror + verify (manual run) |
 | `.github/workflows/dhi-jfrog-sync.yml` | hourly sync + verify |
 | `Jenkinsfile` | the same, for Jenkins |

@@ -25,7 +25,7 @@ pipeline {
 
   environment {
     // Edit these for your setup.
-    DOCKER_ORG = 'your-org'            // Docker Hub organization (also the OAT's username)
+    DHI_ORG = 'your-org'            // Docker Hub organization (also the OAT's username)
     SRC_IMAGE  = 'dhi-node'            // the dhi-<name> repository on Docker Hub
     DEST_IMAGE = 'dhi-node'            // image name in Artifactory
     JFROG_HOST = 'acme.jfrog.io'       // no https://

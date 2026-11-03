@@ -28,7 +28,7 @@ for tag in $TAGS; do
   printf '\n   %s%s:%s%s  %s\n' "$B" "$SRC_IMAGE" "$tag" "$N" "$digest"
   { echo "index $digest"; platforms "$SRC@$digest"; } | while read -r name sdig; do
     list=$(referrers "$SRC@$sdig" "$ATT_SRC" 2>&1) ||
-      die "cannot read attestations from $ATT_SRC: ${list##*$'\n'} (run make login; token needs pull on $DOCKER_ORG/$SRC_IMAGE)"
+      die "cannot read attestations from $ATT_SRC: ${list##*$'\n'} (run make login; token needs pull on $DHI_ORG/$SRC_IMAGE)"
     [ -n "$list" ] || { info "$(printf '%-14s' "$name") (none)"; continue; }
     while read -r r; do
       info "$(printf '%-14s %-29s %s' "$name" "$(label "$(jq -r .type <<<"$r")")" "$(jq -r .digest <<<"$r" | cut -c1-19)")"
