@@ -27,6 +27,8 @@ The repository name is a setting in `.env`.
 
 ## Prerequisites
 
+Only needed to run from your machine. GitHub Actions installs what it needs.
+
 | Tool | Install (macOS) |
 |---|---|
 | `regctl`, `regsync` | `brew install regclient` |
@@ -75,7 +77,26 @@ Permission **Repo Read-only**. The account must be a member of the organization.
 Goes into `.env` as `SCOUT_TOKEN`, with `SCOUT_USERNAME` set to your personal Docker ID.
 Mirroring and `make verify` work without it.
 
-### 3. Settings
+### 3. GitHub Actions variables and secrets (run the mirroring in GitHub)
+
+The workflows run the mirroring for you; nothing is installed on your machine. In the
+GitHub repository that holds this project, open **Settings → Secrets and variables → Actions**
+and add:
+
+| Tab | Name | Value |
+|---|---|---|
+| **Variables** | `DOCKER_ORG` | Docker Hub organization name |
+| **Variables** | `SRC_IMAGE` | the Hub mirror, for example `dhi-node` |
+| **Variables** | `DEST_IMAGE` | image name in Artifactory (same as `SRC_IMAGE` unless you rename it) |
+| **Variables** | `TAGS` | tags to mirror, space separated, for example `24 24-dev` |
+| **Variables** | `DOCKER_USERNAME` | organization name |
+| **Secrets** | `DOCKER_TOKEN` | the OAT |
+| **Variables** | `JFROG_HOST` | Artifactory hostname, no `https://` |
+| **Variables** | `JFROG_REPO` | the JFrog repository |
+| **Variables** | `JFROG_USER` | username from Set Me Up |
+| **Secrets** | `JFROG_TOKEN` | the Artifactory token |
+
+### 4. Local settings (`.env`), to run from your machine
 
 ```bash
 cp .env.example .env && chmod 600 .env
@@ -94,21 +115,20 @@ tokens. Comments in `.env.example` explain where to get each value.
 | `SCOUT_USERNAME` | your personal Docker ID (optional) | `docker scout` |
 | `SCOUT_TOKEN` | **PAT** (Repo Read-only) (optional) | `docker scout` |
 
-`.env` is git-ignored. For GitHub Actions, see the next step.
-
-### 4. GitHub Actions variables and secrets (to run the workflows)
-
-The workflows do not read `.env`. Add the same values to the GitHub repository
-that holds this project: **Settings → Secrets and variables → Actions**.
-
-| Tab | Name | Value from `.env` |
-|---|---|---|
-| **Variables** | `DOCKER_ORG`, `SRC_IMAGE`, `DEST_IMAGE`, `TAGS`, `DOCKER_USERNAME` | same as in `.env` |
-| **Variables** | `JFROG_HOST`, `JFROG_REPO`, `JFROG_USER` | same as in `.env` |
-| **Secrets** | `DOCKER_TOKEN` | the OAT |
-| **Secrets** | `JFROG_TOKEN` | the Artifactory token |
+`.env` is git-ignored. The GitHub workflows do not read it.
 
 ## Mirror
+
+### Option 1: GitHub Actions
+
+Run the **Mirror DHI → Artifactory** workflow (`.github/workflows/mirror.yml`;
+Actions tab → Run workflow). It installs the tools, logs in, and runs the four
+steps below with the variables and secrets from Setup, step 3. Optionally enter
+tags to mirror; the default is the `TAGS` variable.
+
+### Option 2: from your machine
+
+Needs the tools from Prerequisites and the `.env` file from Setup, step 4.
 
 ```bash
 make login     # regctl and docker log in to Docker Hub, the Scout registry and Artifactory
@@ -116,11 +136,6 @@ make inspect   # tags, digests and attestations that will be mirrored
 make mirror    # copy image + attestations into the JFrog repository, by digest
 make verify    # check the result from Artifactory: digests, attestations, signatures
 ```
-
-**In GitHub Actions:** run the **Mirror DHI → Artifactory** workflow
-(`.github/workflows/mirror.yml`, Actions tab → Run workflow). It runs the four
-steps above, reading the `.env` values from repository variables and secrets
-(Setup, step 4). Optionally enter tags to mirror; the default is the `TAGS` variable.
 
 `make mirror` runs the `regctl` command from the Docker docs once per tag:
 
@@ -151,7 +166,7 @@ at a new digest. Run the sync continuously.
   Tags are an allow-list in `regsync.yaml`; keep it equal to `TAGS` in `.env`.
 - **GitHub Actions**: `.github/workflows/dhi-jfrog-sync.yml` runs `regsync once`
   and `make verify` hourly and on demand. Set the variables and secrets from
-  Setup, step 4. The mirror workflow uses the same ones.
+  Setup, step 3. The mirror workflow uses the same ones.
 - **On change**: add a [Docker Hub webhook](https://docs.docker.com/docker-hub/repos/manage/webhooks/)
   on the mirrored repository that triggers the workflow (`repository_dispatch`,
   type `dhi-updated`). The payload's `dhi_metadata` lists the CVEs fixed.
