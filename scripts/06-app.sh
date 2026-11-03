@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# Developer / CI flow: build an application on the DHI image from Artifactory.
+# Developer flow: build an application on the DHI image from Artifactory.
 #
 #   1. verify the base image signature from Artifactory (supply-chain gate)
 #   2. pin the base to its current digest
-#   3. build examples/app FROM it
-#        default    load into the local image store and run it
-#        PUSH=true  push to Artifactory with SBOM + max provenance, which Docker
-#                   Scout follows back to the DHI base to apply its VEX
+#   3. build examples/app FROM it, load it into the local image store and run it
 . "$(dirname "$0")/lib.sh"
 need regctl "https://github.com/regclient/regclient/releases"
 need cosign "https://github.com/sigstore/cosign/releases"
@@ -17,7 +14,7 @@ APP_NAME="${APP_NAME:-hello-dhi}"
 APP_TAG="${APP_TAG:-1.0.0}"
 NODE_TAG="${NODE_TAG:-24}"
 NODE_DEV_TAG="${NODE_DEV_TAG:-${NODE_TAG}-dev}"
-APP_IMAGE="${APPS}/${APP_NAME}:${APP_TAG}"
+APP_IMAGE="${APP_NAME}:${APP_TAG}"
 
 step "Gate: verify the DHI base images from Artifactory"
 # Each DHI attestation is signed by Docker; checking the SLSA provenance
@@ -42,15 +39,6 @@ build=(docker buildx build "$ROOT/examples/app" --progress "${BUILD_PROGRESS:-qu
   --label "org.opencontainers.image.base.name=$PULL:$NODE_TAG"
   --label "org.opencontainers.image.base.digest=$run_digest"
   --tag "$APP_IMAGE")
-
-if [ "${PUSH:-false}" = true ]; then
-  step "Build and push $APP_IMAGE (SBOM + max provenance)"
-  run "${build[@]}" --platform "${APP_PLATFORMS:-linux/amd64,linux/arm64}" \
-    --sbom=true --provenance=mode=max --push
-  ok "pushed $APP_IMAGE"
-  info "scan: docker scout cves registry://$APP_IMAGE"
-  exit 0
-fi
 
 step "Build $APP_IMAGE and run it locally"
 run "${build[@]}" --platform "$PLATFORM" --load

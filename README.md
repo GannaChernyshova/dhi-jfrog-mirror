@@ -41,16 +41,15 @@ Repository names are settings in `.env`. The minimum is one local repository.
 | Key (default) | Type | Purpose |
 |---|---|---|
 | `<dhi-repo>` | Docker, **local** | Mirror target. Only the sync account writes here. |
-| `apps-local` | Docker, local | Images your teams build. Optional. |
-| `docker` | Docker, virtual | the DHI repository + `apps-local`, default deployment repo `apps-local`. The URL developers and CI use. Optional. |
+| `docker` | Docker, virtual | Includes the DHI repository. The URL developers and CI use. Optional. |
 
 Permissions:
 
 | Account | Permissions |
 |---|---|
 | Sync | Read, Deploy/Cache, **Delete/Overwrite** on the DHI repository (DHI re-points tags on every CVE rebuild) |
-| CI | Read on `docker` and the DHI repository; Deploy/Cache on `apps-local` |
-| Developers | Read on `docker`, the DHI repository, `apps-local` |
+| CI | Read on `docker` and the DHI repository |
+| Developers | Read on `docker` and the DHI repository |
 
 ### 2. Tokens
 
@@ -109,8 +108,10 @@ that holds this project: **Settings → Secrets and variables → Actions**.
 | **Secrets** | `DOCKER_TOKEN` | the OAT |
 | **Secrets** | `JFROG_TOKEN` | the Artifactory token |
 
-Tokens go in **Secrets**, never in Variables. `SCOUT_USERNAME` and `SCOUT_TOKEN`
-are not needed by these workflows.
+Tokens go in **Secrets**, never in Variables. The workflows read the image and its
+attestations (from `registry.scout.docker.com`) with `DOCKER_TOKEN`, so
+`SCOUT_USERNAME` and `SCOUT_TOKEN` are not needed. They are only for the
+`docker scout` CLI (`make use`); add them as well if you add a scan step.
 
 Or set them all from `.env` with the [GitHub CLI](https://cli.github.com/)
 (`gh auth login` first; run it inside the cloned repository, or add `-R <owner>/<repo>`):

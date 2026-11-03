@@ -30,9 +30,6 @@ use: ## Pull/run via the consumer URL, export SBOM + VEX, scan with Docker Scout
 app: ## Verify the DHI base, build examples/app FROM it and run it locally
 	@bash scripts/06-app.sh
 
-app-push: ## Same, multi-platform with SBOM + provenance, pushed to the apps repo (CI)
-	@PUSH=true bash scripts/06-app.sh
-
 demo: login inspect mirror verify use app ## Full run
 
-.PHONY: help login inspect mirror verify sync sync-once use app app-push demo
+.PHONY: help login inspect mirror verify sync sync-once use app demo

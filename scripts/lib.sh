@@ -26,14 +26,11 @@ ATT_SRC="registry.scout.docker.com/${DOCKER_ORG}/${SRC_IMAGE}"
 # Destination in Artifactory (repository-path method: <host>/<repo-key>/<image>).
 #   DEST  the local repo the sync writes to
 #   PULL  what developers and CI use: the virtual repo if there is one
-#   APPS  where application images are pushed
 : "${JFROG_HOST:?set JFROG_HOST in .env (e.g. acme.jfrog.io)}"
 JFROG_REPO="${JFROG_REPO:-dhi-local}"
 JFROG_VIRTUAL="${JFROG_VIRTUAL:-}"
-JFROG_APPS_REPO="${JFROG_APPS_REPO:-}"
 DEST="${JFROG_HOST}/${JFROG_REPO}/${DEST_IMAGE}"
 PULL="${JFROG_HOST}/${JFROG_VIRTUAL:-$JFROG_REPO}/${DEST_IMAGE}"
-APPS="${JFROG_HOST}/${JFROG_VIRTUAL:-${JFROG_APPS_REPO:-$JFROG_REPO}}"
 
 DHI_KEY="$ROOT/keys/dhi-latest.pub"
 DHI_KEY_URL="https://registry.scout.docker.com/keyring/dhi/latest.pub"
