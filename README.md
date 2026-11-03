@@ -11,20 +11,16 @@ Based on [Mirror a DHI repository](https://docs.docker.com/dhi/how-to/mirror/),
 ## How it works
 
 ```
- Docker Hub (your org)                            Artifactory
- docker.io/<org>/dhi-node            image   ┐    <dhi-repo>  (local)    DHI images + attestations
- registry.scout.docker.com/<org>/    attest. ┘──▶                        written only by the sync
-   dhi-node                           regctl / regsync, by digest
-                                                  apps-local  (local)    images you build FROM DHI
-                                                  docker      (virtual)  = <dhi-repo> + apps-local
-                                                       ▲                 the one URL for laptops and CI
-                                       developers, CI ─┘  pull / push
+ Docker Hub (your org)                    Artifactory
+ docker.io/<org>/dhi-node         image  ┐
+ registry.scout.docker.com/...    attest.┘─ sync, by digest ─▶  <dhi-repo>   DHI images + attestations
+                                                                   ▲
+                                                 developers, CI ───┘ pull
 ```
 
-DHI attestations are not stored next to the image; they live in Docker's Scout
-registry. A plain `docker push` or an Artifactory **remote** (pull-through)
-repository copies the image only. This sync copies image and attestations into
-one **local** repository, by digest, so they stay verifiable and scannable from
+The image is on Docker Hub, but its signed attestations (SBOM, provenance, VEX,
+scan results) are in Docker's Scout registry. The sync copies both into one
+Artifactory repository, by digest, so they stay verifiable and scannable from
 Artifactory alone.
 
 Repository names are settings in `.env`. The minimum is one local repository.
