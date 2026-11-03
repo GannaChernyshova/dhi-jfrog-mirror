@@ -29,13 +29,8 @@ jobs:
       SRC_IMAGE: ${{ vars.SRC_IMAGE }}
       DEST_IMAGE: ${{ vars.DEST_IMAGE }}
       TAGS: ${{ inputs.tags || vars.TAGS }}
-      DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
       JFROG_HOST: ${{ vars.JFROG_HOST }}
       JFROG_REPO: ${{ vars.JFROG_REPO }}
-      JFROG_USER: ${{ vars.JFROG_USER }}
-      # Repository secrets (Settings → Secrets and variables → Actions → Secrets)
-      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
-      JFROG_TOKEN: ${{ secrets.JFROG_TOKEN }}
       REGCLIENT_VERSION: v0.11.7
       COSIGN_VERSION: v3.1.4
     steps:
@@ -48,8 +43,26 @@ jobs:
           curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
             -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
 
-      - name: Log in (make login)
-        run: bash scripts/01-login.sh
+      # regctl and cosign read the credentials that docker/login-action stores.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Log in to the Scout registry (attestations)
+        uses: docker/login-action@v3
+        with:
+          registry: registry.scout.docker.com
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Log in to Artifactory
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.JFROG_HOST }}
+          username: ${{ vars.JFROG_USER }}
+          password: ${{ secrets.JFROG_TOKEN }}
 
       - name: Inspect (make inspect)
         run: bash scripts/02-inspect.sh
