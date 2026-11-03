@@ -54,8 +54,8 @@ dhictl mirror list
 Or run it from GitHub: **Actions → Mirror DHI into Docker Hub → Run workflow**
 (`.github/workflows/dhi-hub-mirror.yml`). It installs `dhictl`, exchanges the
 `DOCKER_TOKEN` secret for an API token, and mirrors `DHI_SOURCE` (for example
-`node`) into `<DHI_ORG>/<SRC_IMAGE>`. Add the variables and secret from step 4 first,
-plus the variable `DHI_SOURCE`.
+`node`) into `<DHI_ORG>/<SRC_IMAGE>`. Add the variables and secret from step 4 first.
+`DHI_SOURCE` is optional: it defaults to `SRC_IMAGE` without the `dhi-` prefix.
 
 `DHI_ORG` and `DHI_API_TOKEN` are the names `dhictl` reads. `DHI_API_TOKEN` is the
 short-lived API token from the exchange above, not your organization access token,
@@ -98,7 +98,7 @@ In your GitHub repository: **Settings → Secrets and variables → Actions**.
 |---|---|---|
 | Variables | `DHI_ORG` | Docker Hub organization name (also the OAT's username) |
 | Variables | `SRC_IMAGE` | the Hub repository, for example `dhi-node` |
-| Variables | `DHI_SOURCE` | only for the Docker Hub mirror workflow: the image's name in the DHI catalog, for example `node` |
+| Variables | `DHI_SOURCE` | optional, only for the Docker Hub mirror workflow: the image's name in the DHI catalog, for example `node` (default: `SRC_IMAGE` without `dhi-`) |
 | Variables | `DEST_IMAGE` | image name in Artifactory (normally the same as `SRC_IMAGE`) |
 | Variables | `TAGS` | tags to mirror, space separated, for example `24 24-dev` |
 | Variables | `JFROG_HOST` | Artifactory hostname without `https://`, for example `acme.jfrog.io` |
