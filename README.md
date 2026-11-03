@@ -60,6 +60,13 @@ Repository access: the mirrored `dhi-*` repositories, scope **Image Pull**. No o
 The same token reads the attestations from `registry.scout.docker.com`.
 Goes into `.env` as `DOCKER_TOKEN`, with `DOCKER_USERNAME` set to the organization name.
 
+**Artifactory token**, used by the sync to write.
+Repository → **Set Me Up** → generate a token, or **Edit Profile → Identity Tokens**;
+for a service account use an access token
+([docs](https://jfrog.com/help/r/jfrog-platform-administration-documentation/access-tokens)).
+Use the token itself, not the base64 `auth` value shown for `config.json`.
+Goes into `.env` as `JFROG_TOKEN`, with `JFROG_USER` set to the username shown in **Set Me Up**.
+
 **Optional: Docker personal access token (PAT).** Only needed to scan with Docker Scout
 (Scout does not accept OATs). Skip it if you scan with another tool, such as Black Duck.
 Docker Hub → account → **Account settings → Personal access tokens → Generate new token**
@@ -67,13 +74,6 @@ Docker Hub → account → **Account settings → Personal access tokens → Gen
 Permission **Repo Read-only**. The account must be a member of the organization.
 Goes into `.env` as `SCOUT_TOKEN`, with `SCOUT_USERNAME` set to your personal Docker ID.
 Mirroring and `make verify` work without it.
-
-**Artifactory token**, used by the sync to write.
-Repository → **Set Me Up** → generate a token, or **Edit Profile → Identity Tokens**;
-for a service account use an access token
-([docs](https://jfrog.com/help/r/jfrog-platform-administration-documentation/access-tokens)).
-Use the token itself, not the base64 `auth` value shown for `config.json`.
-Goes into `.env` as `JFROG_TOKEN`, with `JFROG_USER` set to the username shown in **Set Me Up**.
 
 ### 3. Settings
 
