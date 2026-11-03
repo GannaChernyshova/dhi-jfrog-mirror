@@ -1,0 +1,62 @@
+name: Mirror DHI → Artifactory
+
+# The "make login / inspect / mirror / verify" steps from the README, run in
+# GitHub Actions: copy each tag of the DHI repository, with its signed
+# attestations, into the Artifactory local repository, by digest, then prove the
+# result from Artifactory alone. Run it by hand for the first mirror, or to add
+# tags. dhi-jfrog-sync.yml keeps the tags up to date afterwards.
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Tags to mirror, space separated (default: the TAGS repository variable)"
+        required: false
+        type: string
+
+concurrency:
+  group: dhi-jfrog-sync   # same group as the scheduled sync: never write to the repo twice at once
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    env:
+      # Repository variables (Settings → Secrets and variables → Actions → Variables)
+      DOCKER_ORG: ${{ vars.DOCKER_ORG }}
+      SRC_IMAGE: ${{ vars.SRC_IMAGE }}
+      DEST_IMAGE: ${{ vars.DEST_IMAGE }}
+      TAGS: ${{ inputs.tags || vars.TAGS }}
+      DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+      JFROG_HOST: ${{ vars.JFROG_HOST }}
+      JFROG_REPO: ${{ vars.JFROG_REPO }}
+      JFROG_VIRTUAL: ${{ vars.JFROG_VIRTUAL }}
+      JFROG_USER: ${{ vars.JFROG_USER }}
+      # Repository secrets (Settings → Secrets and variables → Actions → Secrets)
+      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+      JFROG_TOKEN: ${{ secrets.JFROG_TOKEN }}
+      REGCLIENT_VERSION: v0.11.7
+      COSIGN_VERSION: v3.1.4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install regctl and cosign
+        run: |
+          curl -sSfL "https://github.com/regclient/regclient/releases/download/${REGCLIENT_VERSION}/regctl-linux-amd64" \
+            -o /usr/local/bin/regctl && chmod +x /usr/local/bin/regctl
+          curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
+            -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
+
+      - name: Log in (make login)
+        run: bash scripts/01-login.sh
+
+      - name: Inspect (make inspect)
+        run: bash scripts/02-inspect.sh
+
+      - name: Mirror image and attestations (make mirror)
+        run: bash scripts/03-mirror.sh
+
+      - name: Verify from Artifactory (make verify)
+        run: bash scripts/04-verify.sh
