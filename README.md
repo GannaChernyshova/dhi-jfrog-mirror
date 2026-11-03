@@ -28,7 +28,36 @@ A plain `docker pull` / `docker push` would copy the image without them.
 
 ## Setup
 
-### 1. Mirror DHI into your Docker Hub organization
+### 1. Create two tokens
+
+Do this first: `dhictl` (step 2) and the sync both use the Docker token.
+
+**Docker organization access token (OAT)**: Docker Hub → your organization →
+**Settings → Access tokens → Generate token**
+([docs](https://docs.docker.com/security/access-tokens/organization-access-tokens/#create-an-organization-access-token)).
+Give it these scopes:
+
+| Level | Resource | Scopes |
+|---|---|---|
+| Repositories | `*/*/public` | `scope-image-pull` |
+| Repositories | `<org>/*` | `scope-image-push`, `scope-repository-edit` |
+| Organization | `<org>` | `scope-repository-create`, `scope-repository-list` |
+
+It is used to create the mirror (`dhictl`), and to read the image from Docker Hub
+**and** its attestations from the Scout registry (the sync). Its username is the
+**organization name**, not your personal Docker ID. It is shown once: copy it now.
+It goes in `DOCKER_TOKEN` below.
+
+**Artifactory token**: Artifactory → your avatar → **Edit Profile → Identity
+Tokens** (or **Set Me Up** on the repository, once it exists)
+([docs](https://jfrog.com/help/r/jfrog-platform-administration-documentation/access-tokens)).
+Use the token itself, not the base64 `auth` value Set Me Up shows. It is used to
+write to `<jfrog-repo>`, and goes in `JFROG_TOKEN` below.
+
+> A Docker personal access token (PAT) is **not** needed for mirroring. It is only
+> for Docker Scout scans, see [Optional: Docker Scout](#optional-docker-scout-scans).
+
+### 2. Mirror DHI into your Docker Hub organization
 
 Skip this if your organization already has the `dhi-<name>` repository (for
 example `dhi-node`). Do it once per image
@@ -75,34 +104,17 @@ names differ) in **Run workflow**: they win over the variables for that run.
 short-lived API token from the exchange above, not your organization access token,
 which this project calls `DOCKER_TOKEN`.
 
-Creating a new mirror repository needs a token with organization-wide repository
-access; the sync token in step 3 only needs Image Pull. Use a separate, short-lived
-token for this one-time step. For the workflow, put that token in the `DOCKER_TOKEN`
-secret for the run, then replace it with the Image Pull token.
+`dhictl` and the workflow use the `DOCKER_TOKEN` from step 1. The Docker Hub UI needs no token.
 
 Once `<org>/dhi-node` exists, note its tags (Docker Hub → the repository → Tags):
 they go in `TAGS` below.
 
-### 2. Create the Artifactory repository
+### 3. Create the Artifactory repository
 
 Create a **Docker** repository in Artifactory. Its name is `<jfrog-repo>` below.
 Give the sync account **Read, Deploy/Cache and Delete/Overwrite** on it (DHI
 re-points tags on every CVE rebuild, so overwrite is required). CI and developers
 need **Read**.
-
-### 3. Create two tokens
-
-Mirroring needs only these two.
-
-| Token | Create it at | Settings | Used to |
-|---|---|---|---|
-| **Docker organization access token (OAT)** | Docker Hub → your organization → **Settings → Access tokens → Generate token** ([docs](https://docs.docker.com/security/access-tokens/organization-access-tokens/#create-an-organization-access-token)) | Repository access: the `dhi-*` repositories. Scope: **Image Pull** only. | read the image from Docker Hub **and** the attestations from the Scout registry |
-| **Artifactory token** | Artifactory → your repository → **Set Me Up** → generate a token ([docs](https://jfrog.com/help/r/jfrog-platform-administration-documentation/access-tokens)) | Use the token itself, not the base64 `auth` value Set Me Up shows. | write to `<jfrog-repo>` |
-
-The OAT's username is the **organization name**, not your personal Docker ID.
-
-> A Docker personal access token (PAT) is **not** needed for mirroring. It is only
-> for Docker Scout scans, see [Optional: Docker Scout](#optional-docker-scout-scans).
 
 ### 4. Add the values to GitHub
 
@@ -250,7 +262,7 @@ so Scout can follow the provenance back to the DHI base and apply its VEX
 | Symptom | Fix |
 |---|---|
 | `failed to ping registry docker.io: unauthorized` | `DHI_ORG` must be the organization name (not your Docker ID) and `DOCKER_TOKEN` an organization access token. |
-| `cannot read attestations from registry.scout.docker.com/…: unauthorized` | The OAT needs **Image Pull** on that `dhi-*` repository. |
+| `cannot read attestations from registry.scout.docker.com/…: unauthorized` | The OAT is missing a scope from step 1, or `DHI_ORG` is not the organization name. |
 | Push rejected / `403` on an existing tag | Give the sync account Delete/Overwrite on the JFrog repository. |
 | Attestations missing after mirroring | `JFROG_REPO` must be a Docker repository the sync account can push to. |
 | Digest in Artifactory differs from Hub | Docker re-pointed the tag. Run the sync again. |
