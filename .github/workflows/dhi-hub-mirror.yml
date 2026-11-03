@@ -6,6 +6,15 @@ name: Mirror DHI into Docker Hub
 # "Mirror DHI → Artifactory" workflow then copies it into Artifactory.
 on:
   workflow_dispatch:
+    inputs:
+      src_image:
+        description: "Repository to create in your organization, for example dhi-node (default: the SRC_IMAGE variable)"
+        required: false
+        type: string
+      dhi_source:
+        description: "Image name in the DHI catalog, for example node (default: the DHI_SOURCE variable, else src_image without dhi-)"
+        required: false
+        type: string
 
 concurrency:
   group: dhi-hub-mirror
@@ -20,8 +29,9 @@ jobs:
     env:
       # Repository variables (Settings → Secrets and variables → Actions → Variables)
       DHI_ORG: ${{ vars.DHI_ORG }}          # Docker Hub organization
-      DHI_SOURCE: ${{ vars.DHI_SOURCE }}    # image in the DHI catalog, for example: node (optional: defaults to SRC_IMAGE without "dhi-")
-      SRC_IMAGE: ${{ vars.SRC_IMAGE }}      # repository to create in your organization, for example: dhi-node
+      # A value typed in "Run workflow" wins over the repository variable.
+      DHI_SOURCE: ${{ inputs.dhi_source || vars.DHI_SOURCE }}   # image in the DHI catalog, for example: node (optional: defaults to SRC_IMAGE without "dhi-")
+      SRC_IMAGE: ${{ inputs.src_image || vars.SRC_IMAGE }}      # repository to create in your organization, for example: dhi-node
       DHICTL_VERSION: v0.0.10
     steps:
       - name: Install dhictl
@@ -51,7 +61,7 @@ jobs:
       - name: Start mirror
         run: |
           for v in DHI_ORG SRC_IMAGE; do
-            [ -n "${!v}" ] || { echo "::error::Set the repository variable $v (Settings → Secrets and variables → Actions → Variables)."; exit 1; }
+            [ -n "${!v}" ] || { echo "::error::Set $v: as a repository variable (Settings → Secrets and variables → Actions → Variables) or, for SRC_IMAGE, in Run workflow."; exit 1; }
           done
           source="${DHI_SOURCE:-${SRC_IMAGE#dhi-}}"   # dhi-node → node
           echo "Mirroring dhi/$source into $DHI_ORG/$SRC_IMAGE"

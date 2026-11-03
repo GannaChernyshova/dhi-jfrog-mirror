@@ -31,10 +31,22 @@ A plain `docker pull` / `docker push` would copy the image without them.
 ### 1. Mirror DHI into your Docker Hub organization
 
 Skip this if your organization already has the `dhi-<name>` repository (for
-example `dhi-node`). Do it once per image, with the `dhictl` CLI
-([docs](https://docs.docker.com/dhi/how-to/mirror/)).
+example `dhi-node`). Do it once per image
+([docs](https://docs.docker.com/dhi/how-to/mirror/)). You need a DHI Select or
+Enterprise subscription and must be an organization owner or editor.
 
-Install: download `dhictl` for your platform from the
+**In Docker Hub (recommended)**
+
+1. Sign in to Docker Hub → **My Hub** → pick your organization in the namespace drop-down.
+2. **Hardened Images → Catalog**, and open the image (for example Node).
+3. **Use this image → Mirror repository**, then follow the on-screen steps.
+4. Wait a few minutes for the tags to finish. The repository appears in your
+   organization as `dhi-<name>`; check it under **Hardened Images → Manage →
+   Mirrored Images**.
+
+**With the `dhictl` CLI**, if you prefer a script or the UI is not available to you:
+
+Install `dhictl`: download it for your platform from the
 [releases page](https://github.com/docker-hardened-images/dhictl/releases) and put
 it on your `PATH` (`mv dhictl /usr/local/bin/`). Docker Desktop 4.65+ already has
 the same commands as `docker dhi`.
@@ -56,6 +68,8 @@ Or run it from GitHub: **Actions → Mirror DHI into Docker Hub → Run workflow
 `DOCKER_TOKEN` secret for an API token, and mirrors `DHI_SOURCE` (for example
 `node`) into `<DHI_ORG>/<SRC_IMAGE>`. Add the variables and secret from step 4 first.
 `DHI_SOURCE` is optional: it defaults to `SRC_IMAGE` without the `dhi-` prefix.
+To mirror a different image for one run, type `src_image` (and `dhi_source` if the
+names differ) in **Run workflow**: they win over the variables for that run.
 
 `DHI_ORG` and `DHI_API_TOKEN` are the names `dhictl` reads. `DHI_API_TOKEN` is the
 short-lived API token from the exchange above, not your organization access token,
