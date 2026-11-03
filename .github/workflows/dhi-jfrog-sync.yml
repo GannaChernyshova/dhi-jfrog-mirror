@@ -28,7 +28,6 @@ jobs:
       SRC_IMAGE: ${{ vars.SRC_IMAGE }}
       DEST_IMAGE: ${{ vars.DEST_IMAGE }}
       TAGS: ${{ vars.TAGS }}
-      DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
       JFROG_HOST: ${{ vars.JFROG_HOST }}
       JFROG_REPO: ${{ vars.JFROG_REPO }}
       JFROG_USER: ${{ vars.JFROG_USER }}

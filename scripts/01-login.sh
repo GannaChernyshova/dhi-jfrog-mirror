@@ -5,12 +5,12 @@
 need_source
 need regctl "https://github.com/regclient/regclient/releases"
 
-: "${DOCKER_USERNAME:?set DOCKER_USERNAME in .env}" "${DOCKER_TOKEN:?set DOCKER_TOKEN in .env}"
+: "${DOCKER_TOKEN:?set DOCKER_TOKEN in .env}"
 
 step "Docker Hub (image) and Scout registry (attestations)"
 for reg in docker.io registry.scout.docker.com; do
-  printf '%s' "$DOCKER_TOKEN" | regctl registry login -u "$DOCKER_USERNAME" --pass-stdin "$reg" >/dev/null
-  ok "regctl → $reg as $DOCKER_USERNAME"
+  printf '%s' "$DOCKER_TOKEN" | regctl registry login -u "$DOCKER_ORG" --pass-stdin "$reg" >/dev/null
+  ok "regctl → $reg as $DOCKER_ORG (organization access token)"
 done
 
 step "Docker Scout (docker login docker.io)"
@@ -18,8 +18,8 @@ step "Docker Scout (docker login docker.io)"
 # Docker ID + personal access token here (SCOUT_*), defaulting to DOCKER_*.
 if command -v docker >/dev/null; then
   if printf '%s' "${SCOUT_TOKEN:-$DOCKER_TOKEN}" |
-      docker login -u "${SCOUT_USERNAME:-$DOCKER_USERNAME}" --password-stdin >/dev/null 2>&1; then
-    ok "docker → docker.io as ${SCOUT_USERNAME:-$DOCKER_USERNAME}"
+      docker login -u "${SCOUT_USERNAME:-$DOCKER_ORG}" --password-stdin >/dev/null 2>&1; then
+    ok "docker → docker.io as ${SCOUT_USERNAME:-$DOCKER_ORG}"
   else
     warn "docker login docker.io failed - set SCOUT_USERNAME/SCOUT_TOKEN (Docker ID + PAT) for make use"
   fi

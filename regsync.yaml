@@ -9,10 +9,10 @@ version: 1
 
 creds:
   - registry: docker.io
-    user: '{{env "DOCKER_USERNAME"}}'
+    user: '{{env "DOCKER_ORG"}}'
     pass: '{{env "DOCKER_TOKEN"}}'
   - registry: registry.scout.docker.com
-    user: '{{env "DOCKER_USERNAME"}}'
+    user: '{{env "DOCKER_ORG"}}'
     pass: '{{env "DOCKER_TOKEN"}}'
   - registry: '{{env "JFROG_HOST"}}'
     user: '{{env "JFROG_USER"}}'

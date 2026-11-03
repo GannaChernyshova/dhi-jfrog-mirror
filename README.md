@@ -60,7 +60,7 @@ Docker Hub → organization → **Settings → Access tokens → Generate token*
 Repository access: the mirrored `dhi-*` repositories, scope **Image Pull**. No other scopes
 ([reference](https://docs.docker.com/security/access-tokens/reference/#repository-scopes)).
 The same token reads the attestations from `registry.scout.docker.com`.
-Goes into `.env` as `DOCKER_TOKEN`, with `DOCKER_USERNAME` set to the organization name.
+Goes into `.env` as `DOCKER_TOKEN`. The username for it is `DOCKER_ORG`, the organization name.
 
 **Artifactory token**, used by the sync to write.
 Repository → **Set Me Up** → generate a token, or **Edit Profile → Identity Tokens**;
@@ -89,7 +89,6 @@ and add:
 | **Variables** | `SRC_IMAGE` | the Hub mirror, for example `dhi-node` |
 | **Variables** | `DEST_IMAGE` | image name in Artifactory (same as `SRC_IMAGE` unless you rename it) |
 | **Variables** | `TAGS` | tags to mirror, space separated, for example `24 24-dev` |
-| **Variables** | `DOCKER_USERNAME` | organization name |
 | **Secrets** | `DOCKER_TOKEN` | the OAT |
 | **Variables** | `JFROG_HOST` | Artifactory hostname, no `https://` |
 | **Variables** | `JFROG_REPO` | the JFrog repository |
@@ -107,7 +106,7 @@ tokens. Comments in `.env.example` explain where to get each value.
 
 | `.env` variable | Value | Used for |
 |---|---|---|
-| `DOCKER_USERNAME` | organization name | reading from Docker Hub and the Scout registry |
+| `DOCKER_ORG` | organization name, also the username for the OAT | reading from Docker Hub and the Scout registry |
 | `DOCKER_TOKEN` | **OAT** (Image Pull) | reading from Docker Hub and the Scout registry |
 | `JFROG_HOST` | Artifactory hostname, no `https://` | writing to Artifactory |
 | `JFROG_USER` | username from Set Me Up | writing to Artifactory |
