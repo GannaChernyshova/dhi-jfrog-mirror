@@ -2,7 +2,7 @@ name: Mirror DHI → Artifactory
 
 # The "make login / inspect / mirror / verify" steps from the README, run in
 # GitHub Actions: copy each tag of the DHI repository, with its signed
-# attestations, into the Artifactory local repository, by digest, then prove the
+# attestations, into the Artifactory repository, by digest, then prove the
 # result from Artifactory alone. Run it by hand for the first mirror, or to add
 # tags. dhi-jfrog-sync.yml keeps the tags up to date afterwards.
 on:
@@ -32,7 +32,6 @@ jobs:
       DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
       JFROG_HOST: ${{ vars.JFROG_HOST }}
       JFROG_REPO: ${{ vars.JFROG_REPO }}
-      JFROG_VIRTUAL: ${{ vars.JFROG_VIRTUAL }}
       JFROG_USER: ${{ vars.JFROG_USER }}
       # Repository secrets (Settings → Secrets and variables → Actions → Secrets)
       DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Prove the mirror from Artifactory alone, for the local repo the sync writes
-# to and - if there is one - for the virtual repo developers pull through:
+# Prove the mirror from Artifactory alone, for the repo the sync writes to:
 #   1. each tag's digest in Artifactory == Docker Hub
 #   2. every attestation in Scout (and the signature on it) is in Artifactory
 #   3. every signature verifies with cosign against Docker's DHI key
@@ -55,10 +54,7 @@ check() {
   done < <(referrers "$ATT_SRC@$subject" 2>/dev/null || true)
 }
 
-targets=("$DEST")
-[ "$PULL" != "$DEST" ] && targets+=("$PULL")
-
-for TARGET in "${targets[@]}"; do
+for TARGET in "$DEST"; do
   step "Verify  $TARGET"
   for tag in $TAGS; do
     src=$(regctl manifest head "$SRC:$tag")
