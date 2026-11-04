@@ -10,22 +10,32 @@ need jq "https://jqlang.org"
 need cosign "https://github.com/sigstore/cosign/releases"
 [ -s "$DHI_KEY" ] || die "no DHI key at keys/dhi-latest.pub - run make inspect"
 
-present=0 missing=0 changed=0 verified=0 bad=0
+present=0 missing=0 changed=0 verified=0 bad=0 SIGNED=0
+
+# Referrers of <subject> in Scout. A failed read stops the run: an unreadable
+# source must never pass as "nothing to check".
+source_referrers() {
+  referrers "$ATT_SRC@$1" || die "cannot list attestations of $1 in $ATT_SRC"
+}
 
 # True if <subject> still has referrer <digest> in Scout on three fresh reads.
 source_still_lists() {
-  local i
+  local i list
   for i in 1 2 3; do
-    referrers "$ATT_SRC@$1" | jq -r .digest | grep -qx "$2" || return 1
+    list=$(source_referrers "$1") || exit 1
+    grep -qx "$2" <<<"$(jq -r .digest <<<"$list")" || return 1
   done
 }
 
 # check <label> <subject digest>: every referrer of the subject in Scout must be
-# in TARGET too; signatures must verify; attestations are checked for their own
-# signature (one level of nesting).
+# in TARGET too; signatures must verify; attestations must carry a signature
+# that verifies (one level of nesting). Sets SIGNED to the number of signatures
+# verified directly on the subject.
 check() {
-  local name=$1 subject=$2 r rdig type status actual in_target
-  actual=$(referrers "$TARGET@$subject" | jq -r .digest)
+  local name=$1 subject=$2 r rdig type status actual in_target list sigs=0 fails
+  list=$(source_referrers "$subject") || exit 1
+  actual=$(referrers "$TARGET@$subject" | jq -r .digest) ||
+    die "cannot list referrers of $subject in $TARGET"
   while read -r r; do
     [ -n "$r" ] || continue
     rdig=$(jq -r .digest <<<"$r"); type=$(jq -r .type <<<"$r")
@@ -43,15 +53,34 @@ check() {
     elif [ "$type" != "$SIG_TYPE" ]; then
       present=$((present + 1)); status="${G}✔ present${N}"
     elif cosign verify "${COSIGN_FLAGS[@]}" "$TARGET@$subject" >/dev/null 2>&1; then
-      present=$((present + 1)); verified=$((verified + 1)); status="${G}✔ present, signature verified${N}"
+      present=$((present + 1)); verified=$((verified + 1)); sigs=$((sigs + 1))
+      status="${G}✔ present, signature verified${N}"
     else
       present=$((present + 1)); bad=$((bad + 1)); status="${R}✘ present, signature does NOT verify${N}"
     fi
     printf '   %-14s %-29s %s  %s\n' "$name" "$(label "$type")" "${rdig:7:12}" "$status"
     name=""
-    # An attestation carries its own signature: check it too (when it is there).
-    if [ "$type" != "$SIG_TYPE" ] && $in_target; then check "  └ signed by" "$rdig"; fi
-  done < <(referrers "$ATT_SRC@$subject" 2>/dev/null || true)
+    # An attestation carries its own signature: check it too. One with no
+    # signature at all (none listed, so none failed above) is unsigned: it fails.
+    if [ "$type" != "$SIG_TYPE" ] && $in_target; then
+      fails=$((missing + changed + bad))
+      check "  └ signed by" "$rdig"
+      if [ "$SIGNED" -eq 0 ] && [ $((missing + changed + bad)) -eq "$fails" ]; then
+        bad=$((bad + 1))
+        printf '   %-14s %-29s %s  %s\n' "  └ signed by" "cosign signature" "-" "${R}✘ no signature verifies${N}"
+      fi
+    fi
+  done <<<"$list"
+  SIGNED=$sigs
+}
+
+# require_signed <label> <verified count before>: at least one signature on
+# <label> must have verified since, or an empty listing would pass.
+require_signed() {
+  if [ "$verified" -le "$2" ]; then
+    bad=$((bad + 1))
+    printf '   %s✘%s %s: no signature verified with %s\n' "$R" "$N" "$1" "$DHI_KEY"
+  fi
 }
 
 for TARGET in "$DEST"; do
@@ -65,8 +94,17 @@ for TARGET in "$DEST"; do
       missing=$((missing + 1)); continue
     fi
     ok "digest matches Docker Hub  $dst"
+    plats=$(platforms "$SRC@$src") || die "cannot read the platforms of $SRC@$src"
+    before_tag=$verified
     check "index" "$src"
-    while read -r plat pdig; do check "$plat" "$pdig"; done < <(platforms "$SRC@$src")
+    while read -r plat pdig; do
+      [ -n "$plat" ] || continue
+      before=$verified
+      check "$plat" "$pdig"
+      require_signed "$plat" "$before"
+    done <<<"$plats"
+    # A single-platform image has no platform list: its index is the image.
+    [ -n "$plats" ] || require_signed "$DEST_IMAGE:$tag" "$before_tag"
   done
 done
 
@@ -77,7 +115,8 @@ fi
 info "attestations/signatures present: $present, missing: $missing"
 [ "$changed" -gt 0 ] && warn "$changed attestation(s) were re-issued by Docker since the copy - run make mirror (or regsync) again"
 info "signatures verified with Docker's DHI key: $verified, failed: $bad"
-if [ $((missing + bad)) -eq 0 ]; then
+# A re-issued attestation is not in Artifactory yet: fail until a re-run copies it.
+if [ $((missing + bad + changed)) -eq 0 ]; then
   ok "image and its signed attestations are in Artifactory"
 else
   die "incomplete - re-run make mirror and check the warnings"
