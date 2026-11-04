@@ -12,6 +12,12 @@ need cosign "https://github.com/sigstore/cosign/releases"
 
 present=0 missing=0 changed=0 verified=0 bad=0
 
+# Referrers of <subject> in Scout. A failed read stops the run: an unreadable
+# source must never pass as "nothing to check".
+source_referrers() {
+  referrers "$ATT_SRC@$1" || die "cannot list attestations of $1 in $ATT_SRC"
+}
+
 # True if <subject> still has referrer <digest> in Scout on three fresh reads.
 source_still_lists() {
   local i
@@ -24,8 +30,10 @@ source_still_lists() {
 # in TARGET too; signatures must verify; attestations are checked for their own
 # signature (one level of nesting).
 check() {
-  local name=$1 subject=$2 r rdig type status actual in_target
-  actual=$(referrers "$TARGET@$subject" | jq -r .digest)
+  local name=$1 subject=$2 r rdig type status actual in_target list
+  list=$(source_referrers "$subject") || exit 1
+  actual=$(referrers "$TARGET@$subject" | jq -r .digest) ||
+    die "cannot list referrers of $subject in $TARGET"
   while read -r r; do
     [ -n "$r" ] || continue
     rdig=$(jq -r .digest <<<"$r"); type=$(jq -r .type <<<"$r")
@@ -51,7 +59,16 @@ check() {
     name=""
     # An attestation carries its own signature: check it too (when it is there).
     if [ "$type" != "$SIG_TYPE" ] && $in_target; then check "  └ signed by" "$rdig"; fi
-  done < <(referrers "$ATT_SRC@$subject" 2>/dev/null || true)
+  done <<<"$list"
+}
+
+# require_signed <label> <verified count before>: at least one signature on
+# <label> must have verified since, or an empty listing would pass.
+require_signed() {
+  if [ "$verified" -le "$2" ]; then
+    bad=$((bad + 1))
+    printf '   %s✘%s %s: no signature verified with %s\n' "$R" "$N" "$1" "$DHI_KEY"
+  fi
 }
 
 for TARGET in "$DEST"; do
@@ -65,8 +82,17 @@ for TARGET in "$DEST"; do
       missing=$((missing + 1)); continue
     fi
     ok "digest matches Docker Hub  $dst"
+    plats=$(platforms "$SRC@$src") || die "cannot read the platforms of $SRC@$src"
+    before_tag=$verified
     check "index" "$src"
-    while read -r plat pdig; do check "$plat" "$pdig"; done < <(platforms "$SRC@$src")
+    while read -r plat pdig; do
+      [ -n "$plat" ] || continue
+      before=$verified
+      check "$plat" "$pdig"
+      require_signed "$plat" "$before"
+    done <<<"$plats"
+    # A single-platform image has no platform list: its index is the image.
+    [ -n "$plats" ] || require_signed "$DEST_IMAGE:$tag" "$before_tag"
   done
 done
 
