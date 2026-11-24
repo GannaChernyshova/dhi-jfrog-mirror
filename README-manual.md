@@ -86,12 +86,6 @@ List the attached artifacts (SBOM, provenance, VEX, vulnerability reports):
 regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}"
 ```
 
-Or list them with `docker scout`:
-
-```bash
-docker scout attest list "registry://${DEST_REG}/${DEST_REPO}@${DIGEST}"
-```
-
 ## 5. Verify the signatures from Artifactory
 
 Docker signs each attestation, not the image index. The signature is attached to
