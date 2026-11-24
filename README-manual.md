@@ -99,34 +99,48 @@ alone with Docker's public DHI key
 echo $DEST_REG_TOKEN | cosign login "$DEST_REG" -u "$DEST_REG_USERNAME" --password-stdin
 ```
 
-Verify one attestation. Take its digest from the `regctl artifact list` output in
-step 4:
+`$DIGEST` is the platform digest from step 4. Get the digests of its
+attestations (SBOM, provenance, VEX and so on):
 
 ```bash
+ATTS=$(regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}" \
+    --format '{{json .Manifest}}' |
+  jq -r '.manifests[] | select(.annotations["in-toto.io/predicate-type"] != null) | .digest')
+echo "$ATTS"
+```
+
+Verify the first one:
+
+```bash
+ATT=$(echo "$ATTS" | head -n1)
 cosign verify \
-    "${DEST_REG}/${DEST_REPO}@<attestation-digest>" \
+    "${DEST_REG}/${DEST_REPO}@${ATT}" \
     --key https://registry.scout.docker.com/keyring/dhi/latest.pub \
     --insecure-ignore-tlog=true \
     --experimental-oci11
 ```
 
-Or verify every attestation of the platform image in one go:
+Or verify all of them in one go:
 
 ```bash
-for ATT in $(regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}" \
-      --format '{{json .Manifest}}' | jq -r '.manifests[].digest'); do
-    echo "== $ATT"
-    cosign verify "${DEST_REG}/${DEST_REPO}@${ATT}" \
-      --key https://registry.scout.docker.com/keyring/dhi/latest.pub \
-      --insecure-ignore-tlog=true --experimental-oci11 >/dev/null \
-      && echo "signature OK" || echo "NO VALID SIGNATURE"
-  done
+for ATT in $ATTS; do
+  echo "== $ATT"
+  cosign verify "${DEST_REG}/${DEST_REPO}@${ATT}" \
+    --key https://registry.scout.docker.com/keyring/dhi/latest.pub \
+    --insecure-ignore-tlog=true --experimental-oci11 >/dev/null 2>&1 \
+    && echo "signature OK" || echo "NO VALID SIGNATURE"
+done
 ```
 
 - `--insecure-ignore-tlog=true` is needed because DHI attestations are not
   recorded in the public Rekor log. The signature is still checked against
   Docker's key.
 - `--experimental-oci11` makes `cosign` find signatures stored as OCI referrers.
+  Newer `cosign` versions print "flag has been deprecated" because referrers
+  become the default; the command still works, and you can drop the flag once
+  your version no longer needs it.
+- The "skipping tlog verification" warning is expected with
+  `--insecure-ignore-tlog=true`.
 - A copy of the key is in `keys/dhi-latest.pub`; pass `--key keys/dhi-latest.pub`
   to avoid fetching it.
 - `scripts/04-verify.sh` does the full check: digests match Hub, every Scout
