@@ -123,14 +123,18 @@ cosign verify \
 Or verify all of them in one go:
 
 ```bash
-for ATT in $ATTS; do
-  echo "== $ATT"
+echo "$ATTS" | while read -r ATT; do
+  printf '%s  ' "$ATT"
   cosign verify "${DEST_REG}/${DEST_REPO}@${ATT}" \
     --key https://registry.scout.docker.com/keyring/dhi/latest.pub \
     --insecure-ignore-tlog=true --experimental-oci11 >/dev/null 2>&1 \
     && echo "signature OK" || echo "NO VALID SIGNATURE"
 done
 ```
+
+This reads one digest per line, so it works in both bash and zsh. (A
+`for ATT in $ATTS` loop does not: zsh does not split the variable, so `cosign`
+gets all digests as one reference.)
 
 - `--insecure-ignore-tlog=true` is needed because DHI attestations are not
   recorded in the public Rekor log. The signature is still checked against
