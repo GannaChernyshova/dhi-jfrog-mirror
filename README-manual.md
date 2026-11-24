@@ -17,16 +17,16 @@ Before you start:
 
 ## 1. Set environment variables
 
-```console
-$ export DOCKER_ORG="YOUR_DOCKER_ORG"
-$ export DOCKER_OAT="YOUR_DOCKER_OAT"
-$ export DEST_REG="acme.jfrog.io"
-$ export DEST_REPO="YOUR_JFROG_REPO/dhi-devcontainers-base"
-$ export DEST_REG_USERNAME="YOUR_ARTIFACTORY_USERNAME"
-$ export DEST_REG_TOKEN="YOUR_ARTIFACTORY_TOKEN"
-$ export SRC_REPO="docker.io/${DOCKER_ORG}/dhi-devcontainers-base"
-$ export SRC_ATT_REPO="registry.scout.docker.com/${DOCKER_ORG}/dhi-devcontainers-base"
-$ export TAG="2-debian13-dev"
+```bash
+export DOCKER_ORG="YOUR_DOCKER_ORG"
+export DOCKER_OAT="YOUR_DOCKER_OAT"
+export DEST_REG="acme.jfrog.io"
+export DEST_REPO="YOUR_JFROG_REPO/dhi-devcontainers-base"
+export DEST_REG_USERNAME="YOUR_ARTIFACTORY_USERNAME"
+export DEST_REG_TOKEN="YOUR_ARTIFACTORY_TOKEN"
+export SRC_REPO="docker.io/${DOCKER_ORG}/dhi-devcontainers-base"
+export SRC_ATT_REPO="registry.scout.docker.com/${DOCKER_ORG}/dhi-devcontainers-base"
+export TAG="2-debian13-dev"
 ```
 
 - `DOCKER_OAT` is an organization access token. Its username is the
@@ -41,10 +41,10 @@ $ export TAG="2-debian13-dev"
 
 ## 2. Log in
 
-```console
-$ echo $DOCKER_OAT | regctl registry login -u "$DOCKER_ORG" --pass-stdin docker.io
-$ echo $DOCKER_OAT | regctl registry login -u "$DOCKER_ORG" --pass-stdin registry.scout.docker.com
-$ echo $DEST_REG_TOKEN | regctl registry login -u "$DEST_REG_USERNAME" --pass-stdin "$DEST_REG"
+```bash
+echo $DOCKER_OAT | regctl registry login -u "$DOCKER_ORG" --pass-stdin docker.io
+echo $DOCKER_OAT | regctl registry login -u "$DOCKER_ORG" --pass-stdin registry.scout.docker.com
+echo $DEST_REG_TOKEN | regctl registry login -u "$DEST_REG_USERNAME" --pass-stdin "$DEST_REG"
 ```
 
 The three logins are Docker Hub (the image), the Scout registry (the
@@ -52,8 +52,8 @@ attestations) and Artifactory.
 
 ## 3. Mirror the image and attestations
 
-```console
-$ regctl image copy \
+```bash
+regctl image copy \
      "${SRC_REPO}:${TAG}" \
      "${DEST_REG}/${DEST_REPO}:${TAG}" \
      --referrers \
@@ -76,20 +76,20 @@ signatures.
 
 Get the digest for a tag and platform, for example `linux/amd64`:
 
-```console
+```bash
 DIGEST="$(regctl manifest head "${DEST_REG}/${DEST_REPO}:${TAG}" --platform linux/amd64)"
 ```
 
 List the attached artifacts (SBOM, provenance, VEX, vulnerability reports):
 
-```console
-$ regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}"
+```bash
+regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}"
 ```
 
 Or list them with `docker scout`:
 
-```console
-$ docker scout attest list "registry://${DEST_REG}/${DEST_REPO}@${DIGEST}"
+```bash
+docker scout attest list "registry://${DEST_REG}/${DEST_REPO}@${DIGEST}"
 ```
 
 ## 5. Verify the signatures from Artifactory
@@ -101,15 +101,15 @@ alone with Docker's public DHI key
 
 `cosign` reads the same credentials as `docker login`, so log in once:
 
-```console
-$ echo $DEST_REG_TOKEN | cosign login "$DEST_REG" -u "$DEST_REG_USERNAME" --password-stdin
+```bash
+echo $DEST_REG_TOKEN | cosign login "$DEST_REG" -u "$DEST_REG_USERNAME" --password-stdin
 ```
 
 Verify one attestation. Take its digest from the `regctl artifact list` output in
 step 4:
 
-```console
-$ cosign verify \
+```bash
+cosign verify \
     "${DEST_REG}/${DEST_REPO}@<attestation-digest>" \
     --key https://registry.scout.docker.com/keyring/dhi/latest.pub \
     --insecure-ignore-tlog=true \
@@ -118,8 +118,8 @@ $ cosign verify \
 
 Or verify every attestation of the platform image in one go:
 
-```console
-$ for ATT in $(regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}" \
+```bash
+for ATT in $(regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}" \
       --format '{{json .Manifest}}' | jq -r '.manifests[].digest'); do
     echo "== $ATT"
     cosign verify "${DEST_REG}/${DEST_REPO}@${ATT}" \
