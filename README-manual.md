@@ -26,7 +26,7 @@ $ export DEST_REG_USERNAME="YOUR_ARTIFACTORY_USERNAME"
 $ export DEST_REG_TOKEN="YOUR_ARTIFACTORY_TOKEN"
 $ export SRC_REPO="docker.io/${DOCKER_ORG}/dhi-devcontainers-base"
 $ export SRC_ATT_REPO="registry.scout.docker.com/${DOCKER_ORG}/dhi-devcontainers-base"
-$ export TAG="2-dev"   # confirm in Hub → your repo → Tags
+$ export TAG="2-debian13-dev"
 ```
 
 - `DOCKER_OAT` is an organization access token. Its username is the
@@ -141,7 +141,7 @@ $ for ATT in $(regctl artifact list "${DEST_REG}/${DEST_REPO}@${DIGEST}" \
 ## Several tags
 
 ```bash
-for TAG in 2-dev; do
+for TAG in 2-debian13-dev; do
   regctl image copy \
     "${SRC_REPO}:${TAG}" \
     "${DEST_REG}/${DEST_REPO}:${TAG}" \
